@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment files (secrets) — only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+coverage/
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Uploaded files (if saved to disk during development)
+server/uploads/
