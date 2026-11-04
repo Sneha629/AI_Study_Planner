@@ -60,7 +60,7 @@ Examples: `feat(auth): add JWT login`, `fix(sm2): round interval correctly`, `te
 
 ## Database changes
 
-Only change `server/prisma/schema.prisma` in your feature branch, then run `npm run db:migrate -- --name <what-changed>` and commit the new folder in `prisma/migrations/`. Tell the team in the group chat; everyone runs `npm run db:migrate` after pulling.
+Models live in `server/src/models/`. Change a model only in your feature branch and mention it in the PR, because other routes may depend on the field names. Everyone uses their own database name in `MONGODB_URI` (e.g. `ai-study-planner-rahul`), so test data never mixes. The production database is used only by Render.
 
 ## Secrets
 

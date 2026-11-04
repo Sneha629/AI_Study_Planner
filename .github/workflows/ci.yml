@@ -22,9 +22,6 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci
-      - run: npx prisma validate
-        env:
-          DATABASE_URL: postgresql://user:pass@localhost:5432/db
       - run: npm test
 
   client:
