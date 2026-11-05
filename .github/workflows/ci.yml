@@ -14,15 +14,24 @@ jobs:
         working-directory: server
     services:
       mongo:
-        image: mongo:8
+        # mongo:7, not 8: MongoDB 8.x refuses to start on Linux kernel 6.19+, which
+        # GitHub runners now use. Switch back once a fixed 8.x image is released.
+        # See https://jira.mongodb.org/browse/SERVER-121912
+        image: mongo:7
         ports:
           - 27017:27017
+        # Wait until MongoDB accepts connections before running tests
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     env:
       JWT_SECRET: ci-test-secret
       MONGODB_URI_TEST: mongodb://localhost:27017/ai-study-planner-test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -36,8 +45,8 @@ jobs:
       run:
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
