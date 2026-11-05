@@ -8,15 +8,16 @@ on:
 
 jobs:
   server:
-    # Pinned: mongo:8 refuses to start on Linux kernel 6.19+ (newer ubuntu-latest images).
-    # See https://jira.mongodb.org/browse/SERVER-121912
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: server
     services:
       mongo:
-        image: mongo:8
+        # mongo:7, not 8: MongoDB 8.x refuses to start on Linux kernel 6.19+, which
+        # GitHub runners now use. Switch back once a fixed 8.x image is released.
+        # See https://jira.mongodb.org/browse/SERVER-121912
+        image: mongo:7
         ports:
           - 27017:27017
         # Wait until MongoDB accepts connections before running tests
