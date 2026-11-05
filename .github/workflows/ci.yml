@@ -12,8 +12,14 @@ jobs:
     defaults:
       run:
         working-directory: server
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
     env:
       JWT_SECRET: ci-test-secret
+      MONGODB_URI_TEST: mongodb://localhost:27017/ai-study-planner-test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
