@@ -10,11 +10,11 @@ AI Study Planner turns a student's notes or textbook chapter into flashcards in 
 | --- | --- |
 | Frontend | React + Vite, React Router, Tailwind CSS, Axios, Recharts |
 | Backend | Node.js + Express, Zod, Multer, pdf-parse |
-| Database | PostgreSQL (Neon) + Prisma |
+| Database | MongoDB (Atlas) + Mongoose |
 | Auth | JWT + bcrypt (bcryptjs) |
 | AI | LLM API for card and quiz generation |
 | Testing | Jest, Supertest |
-| Hosting | Vercel (client), Render (server), Neon (database) |
+| Hosting | Vercel (client), Render (server), MongoDB Atlas (database) |
 
 ## Project structure
 
@@ -29,11 +29,11 @@ AI_Study_Planner/
 │       ├── pages/          One file per route
 │       └── utils/
 ├── server/                 Express API
-│   ├── prisma/             schema.prisma + migrations
 │   ├── src/
 │   │   ├── app.js          Express app (exported for tests)
-│   │   ├── index.js        Starts the server
-│   │   ├── lib/            Prisma client
+│   │   ├── index.js        Connects to MongoDB, starts the server
+│   │   ├── config/         Database connection
+│   │   ├── models/         8 Mongoose models (PRD Section 7)
 │   │   ├── middleware/     auth, validate, errorHandler
 │   │   ├── routes/         One router per module
 │   │   ├── services/       sm2, planner, streaks, ai
@@ -45,7 +45,7 @@ AI_Study_Planner/
 
 ## Setup
 
-**Requirements:** Node.js 20+, Git, a free [Neon](https://neon.tech) PostgreSQL database.
+**Requirements:** Node.js 20+, Git, a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster.
 
 ```bash
 git clone <repo-url>
@@ -54,8 +54,7 @@ cd AI_Study_Planner
 # Backend
 cd server
 npm install
-cp .env.example .env        # then fill in DATABASE_URL and JWT_SECRET
-npm run db:migrate          # creates the 8 tables
+cp .env.example .env        # then fill in MONGODB_URI and JWT_SECRET
 npm run dev                 # http://localhost:5000/api/health
 
 # Frontend (new terminal)
@@ -72,7 +71,7 @@ npm run dev                 # http://localhost:5173
 | --- | --- |
 | `PORT` | API port (default 5000) |
 | `CLIENT_URL` | Allowed CORS origin |
-| `DATABASE_URL` | Neon connection string |
+| `MONGODB_URI` | MongoDB Atlas connection string |
 | `JWT_SECRET` | Secret for signing tokens |
 | `JWT_EXPIRES_IN` | Token expiry (7d) |
 | `LLM_API_KEY` | LLM provider key (server only) |
@@ -89,8 +88,6 @@ npm run dev                 # http://localhost:5173
 | --- | --- | --- |
 | server | `npm run dev` | Start API with auto-reload |
 | server | `npm test` | Run Jest tests |
-| server | `npm run db:migrate` | Create a migration after editing `schema.prisma` |
-| server | `npm run db:studio` | Browse the database in the browser |
 | client | `npm run dev` | Start React dev server |
 | client | `npm run build` | Production build |
 | client | `npm run lint` | Lint the frontend |
@@ -101,4 +98,4 @@ F1 Auth · F2 Subjects and decks · F3 Exam date · F4 Manual cards · F5 Upload
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, commit and pull request workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, commit and pull request workflow, and [docs/API.md](docs/API.md) for request and response shapes.

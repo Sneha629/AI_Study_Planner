@@ -1,8 +1,16 @@
 require('dotenv/config')
 const app = require('./app')
+const connectDB = require('./config/db')
 
 const PORT = process.env.PORT || 5000
 
-app.listen(PORT, () => {
-  console.log(`API running on http://localhost:${PORT}`)
-})
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`API running on http://localhost:${PORT}`)
+    })
+  })
+  .catch((err) => {
+    console.error('Could not connect to MongoDB:', err.message)
+    process.exit(1)
+  })
