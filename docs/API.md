@@ -113,3 +113,34 @@ Deck object:
 Rules:
 - `name` 1–100 chars
 - A deck belongs to the user through its subject: check `subject.userId === req.userId`, otherwise 404
+
+---
+
+## Day 3: Cards (F4), all protected
+
+Card object:
+
+```json
+{
+  "_id": "...", "deckId": "...", "front": "What is velocity?", "back": "Speed with direction",
+  "source": "manual", "noteId": null,
+  "easeFactor": 2.5, "intervalDays": 0, "repetitions": 0, "dueDate": "2026-11-07", "isNewCard": true,
+  "createdAt": "..."
+}
+```
+
+The SM-2 fields (`easeFactor`, `intervalDays`, `repetitions`, `dueDate`, `isNewCard`) are set by the server. The client never sends them.
+
+| Method | Route | Body | Response |
+| --- | --- | --- | --- |
+| GET | `/api/decks/:id/cards` | none | 200 `[card, ...]`, oldest first |
+| POST | `/api/decks/:id/cards` | `{ "front": "...", "back": "..." }` | 201 `card` |
+| PATCH | `/api/cards/:id` | `{ "front"?: "...", "back"?: "..." }` (at least one) | 200 `card` |
+| DELETE | `/api/cards/:id` | none | 204, also deletes its reviews |
+
+Rules:
+- `front` 1–500 chars, `back` 1–2000 chars, both trimmed
+- Any other field in the body → 400
+- A new card has `source: "manual"`, `isNewCard: true` and `dueDate` = today in the user's time zone, so it shows up in study mode right away
+- Editing a card changes only its text; SM-2 progress is kept
+- A card belongs to the user through deck → subject; wrong id or someone else's card → 404
