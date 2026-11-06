@@ -4,6 +4,7 @@ const healthRoutes = require('./routes/health.routes')
 const authRoutes = require('./routes/auth.routes')
 const requireAuth = require('./middleware/auth')
 const decksRoutes = require('./routes/decks.routes')
+const cardsRoutes = require('./routes/cards.routes')
 const errorHandler = require('./middleware/errorHandler')
 
 const app = express()
@@ -14,6 +15,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use('/api/health', healthRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api', requireAuth, decksRoutes)
+app.use('/api', requireAuth, cardsRoutes)
 // Day 2+: app.use('/api/subjects', requireAuth, subjectRoutes), ...
 
 app.use((req, res) => {
