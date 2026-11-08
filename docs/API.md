@@ -144,3 +144,38 @@ Rules:
 - A new card has `source: "manual"`, `isNewCard: true` and `dueDate` = today in the user's time zone, so it shows up in study mode right away
 - Editing a card changes only its text; SM-2 progress is kept
 - A card belongs to the user through deck → subject; wrong id or someone else's card → 404
+
+---
+
+## Day 4: Notes (F5), all protected
+
+Upload a student's notes so AI can turn them into cards (F6). Only the text is kept; the file itself is not saved.
+
+Note object (list and upload responses):
+
+```json
+{ "_id": "...", "subjectId": "...", "fileName": "chapter1.pdf", "fileType": "pdf", "textLength": 5230, "createdAt": "..." }
+```
+
+`GET /api/notes/:id` returns the same fields plus `extractedText` (the full text).
+
+| Method | Route | Body | Response |
+| --- | --- | --- | --- |
+| GET | `/api/subjects/:id/notes` | none | 200 `[note, ...]`, newest first, without `extractedText` |
+| POST | `/api/subjects/:id/notes` | `multipart/form-data` with one file in the field `file` | 201 `note`, without `extractedText` |
+| GET | `/api/notes/:id` | none | 200 `note` with `extractedText` |
+| DELETE | `/api/notes/:id` | none | 204; cards made from it are kept (their `noteId` becomes `null`) |
+
+Rules:
+- Only `.pdf` and `.txt`, at most 5 MB → otherwise 400
+- A PDF with no text (a scanned photo of pages) → 400 `"No text found in this PDF..."`
+- Password-protected or broken PDF → 400
+- Wrong id or someone else's subject or note → 404
+
+Frontend upload example:
+
+```js
+const form = new FormData()
+form.append('file', fileInput.files[0])
+await api.post(`/subjects/${subjectId}/notes`, form) // axios sets the multipart header itself
+```
