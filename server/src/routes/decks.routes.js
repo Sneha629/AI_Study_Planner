@@ -14,7 +14,7 @@ router.get('/subjects/:id/decks', async (req, res) => {
   const { id } = req.params
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'Invalid subject ID' })
+    return res.status(404).json({ error: 'Subject not found' })
   }
 
   const subject = await Subject.findOne({
@@ -29,33 +29,35 @@ router.get('/subjects/:id/decks', async (req, res) => {
   const decks = await Deck.find({ subjectId: id }).lean()
 
   const counts = await Card.aggregate([
-    { $match: { deckId: { $in: decks.map(deck => deck._id) } } },
+    { $match: { deckId: { $in: decks.map((deck) => deck._id) } } },
     { $group: { _id: '$deckId', count: { $sum: 1 } } },
   ])
 
   const countMap = new Map(
-    counts.map(item => [item._id.toString(), item.count])
+    counts.map((item) => [item._id.toString(), item.count]),
   )
 
-  const result = decks.map(deck => ({
+  const result = decks.map((deck) => ({
     ...deck,
     cardCount: countMap.get(deck._id.toString()) || 0,
   }))
 
-  res.json({ decks: result })
+  return res.json(result)
 })
 
 // POST create a new deck
 router.post('/subjects/:id/decks', async (req, res) => {
   const { id } = req.params
-  const name = req.body.name?.trim()
+  const name = req.body?.name?.trim()
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'Invalid subject ID' })
+    return res.status(404).json({ error: 'Subject not found' })
   }
 
   if (!name || name.length > 100) {
-    return res.status(400).json({ error: 'Deck name is required (max 100 characters)' })
+    return res.status(400).json({
+      error: 'Deck name is required (max 100 characters)',
+    })
   }
 
   const subject = await Subject.findOne({
@@ -72,22 +74,25 @@ router.post('/subjects/:id/decks', async (req, res) => {
     name,
   })
 
-  res.status(201).json({
-    deck: { ...deck.toJSON(), cardCount: 0 },
+  return res.status(201).json({
+    ...deck.toJSON(),
+    cardCount: 0,
   })
 })
 
 // PATCH rename a deck
 router.patch('/decks/:id', async (req, res) => {
   const { id } = req.params
-  const name = req.body.name?.trim()
+  const name = req.body?.name?.trim()
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'Invalid deck ID' })
+    return res.status(404).json({ error: 'Deck not found' })
   }
 
   if (!name || name.length > 100) {
-    return res.status(400).json({ error: 'Deck name is required (max 100 characters)' })
+    return res.status(400).json({
+      error: 'Deck name is required (max 100 characters)',
+    })
   }
 
   const deck = await Deck.findById(id)
@@ -108,7 +113,7 @@ router.patch('/decks/:id', async (req, res) => {
   deck.name = name
   await deck.save()
 
-  res.json({ deck })
+  return res.json(deck)
 })
 
 // DELETE deck, its cards and their reviews
@@ -116,7 +121,7 @@ router.delete('/decks/:id', async (req, res) => {
   const { id } = req.params
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'Invalid deck ID' })
+    return res.status(404).json({ error: 'Deck not found' })
   }
 
   const deck = await Deck.findById(id)
@@ -135,13 +140,13 @@ router.delete('/decks/:id', async (req, res) => {
   }
 
   const cards = await Card.find({ deckId: id }).select('_id')
-  const cardIds = cards.map(card => card._id)
+  const cardIds = cards.map((card) => card._id)
 
   await Review.deleteMany({ cardId: { $in: cardIds } })
   await Card.deleteMany({ deckId: id })
   await Deck.deleteOne({ _id: id })
 
-  res.json({ message: 'Deck and its cards and reviews deleted successfully' })
+  return res.status(204).end()
 })
 
 module.exports = router
