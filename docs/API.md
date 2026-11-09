@@ -208,3 +208,31 @@ Rules:
 - A review with `intervalBefore: 0` is a card's first review and counts towards the new-card limit
 - `cards: []` means nothing left for today (show "All done for today 🎉")
 - Someone else's or a wrong `deckId` / `subjectId` → 404
+
+---
+
+## Day 5: Review a card (F7, F8), protected
+
+### POST /api/cards/:id/review
+
+Study mode calls this when the student presses a button after seeing the answer.
+
+```json
+// request
+{ "rating": "good" }   // "again" | "hard" | "good" | "easy"
+```
+
+200 with the updated `card` (new `dueDate`, `intervalDays`, `repetitions`, `easeFactor`, `isNewCard: false`). The card then leaves today's queue (`GET /api/study/due`).
+
+SM-2 rules (`server/src/services/sm2.js`):
+
+| Button | What happens |
+| --- | --- |
+| Again | Forgot it: repetitions reset to 0, due tomorrow, ease unchanged |
+| Hard | Next interval as below, ease −0.14 |
+| Good | Next interval as below, ease unchanged |
+| Easy | Next interval as below, ease +0.1 |
+
+Next interval: 1st correct → 1 day, 2nd → 6 days, after that → previous interval × ease (rounded). Ease never goes below 1.3; a new card starts at 2.5.
+
+Errors: bad `rating` or extra fields → 400 · wrong id or someone else's card → 404 · the same card reviewed twice at the same moment (double click) → 409
