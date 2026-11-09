@@ -35,7 +35,8 @@ export function AuthProvider({ children }) {
   }
 
   async function signup(name, email, password) {
-    const res = await api.post('/auth/signup', { name, email, password })
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const res = await api.post('/auth/signup', { name, email, password, timezone })
     saveSession(res.data)
   }
 
