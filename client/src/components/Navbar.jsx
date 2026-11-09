@@ -6,7 +6,18 @@ import { useAuth } from '../context/AuthContext.jsx'
 const links = [
   { to: '/', label: 'Home', icon: HomeIcon, end: true },
   { to: '/subjects', label: 'Subjects', icon: BookIcon },
+  { to: '/study', label: 'Study', icon: CardsIcon },
 ]
+
+function CardsIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="7" width="14" height="13" rx="2" />
+      <path d="M7 4h11a2 2 0 0 1 2 2v11" />
+      <path d="m8 13.5 2 2 3.5-4" />
+    </svg>
+  )
+}
 
 function HomeIcon(props) {
   return (

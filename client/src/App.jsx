@@ -6,6 +6,7 @@ import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Subjects from './pages/Subjects.jsx'
 import SubjectDecks from './pages/SubjectDecks.jsx'
+import Study from './pages/Study.jsx'
 import NotFound from './pages/NotFound.jsx'
 
 import Navbar from './components/Navbar.jsx'
@@ -32,6 +33,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Subjects />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/study"
+            element={
+              <ProtectedRoute>
+                <Study />
               </ProtectedRoute>
             }
           />
