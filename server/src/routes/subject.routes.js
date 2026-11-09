@@ -5,11 +5,19 @@ const Note = require('../models/Note')
 const Deck = require('../models/Deck')
 const Card = require('../models/Card')
 const Review = require('../models/Review')
+const User = require('../models/User')
+const { todayIn } = require('../utils/dates')
 
 const router = Router()
 const subjectFields = ['name', 'examDate']
 
-function validateSubject(body, partial = false) {
+// "Today" in the user's own time zone, so an exam today is allowed even just after midnight
+async function userToday(userId) {
+  const user = await User.findById(userId).select('timezone')
+  return todayIn(user?.timezone)
+}
+
+function validateSubject(body, today, partial = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return [{ field: '_', message: 'Expected an object' }]
   }
@@ -19,6 +27,8 @@ function validateSubject(body, partial = false) {
   if (!partial || Object.hasOwn(body, 'name')) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
       errors.push({ field: 'name', message: 'Name is required' })
+    } else if (body.name.trim().length > 100) {
+      errors.push({ field: 'name', message: 'Name must be at most 100 characters' })
     }
   }
 
@@ -30,7 +40,7 @@ function validateSubject(body, partial = false) {
 
     if (!parsedDate || parsedDate.toISOString().slice(0, 10) !== date) {
       errors.push({ field: 'examDate', message: 'Exam date must be a valid YYYY-MM-DD date' })
-    } else if (date < new Date().toISOString().slice(0, 10)) {
+    } else if (date < today) {
       errors.push({ field: 'examDate', message: 'Exam date cannot be in the past' })
     }
   }
@@ -61,11 +71,11 @@ function sendValidationError(res, errors) {
 
 router.get('/', async (req, res) => {
   const subjects = await Subject.find({ userId: req.userId }).sort({ createdAt: -1 })
-  res.json({ subjects })
+  res.json(subjects)
 })
 
 router.post('/', async (req, res) => {
-  const errors = validateSubject(req.body)
+  const errors = validateSubject(req.body, await userToday(req.userId))
   if (errors.length) return sendValidationError(res, errors)
 
   const subject = await Subject.create({
@@ -73,7 +83,7 @@ router.post('/', async (req, res) => {
     name: req.body.name.trim(),
     ...(Object.hasOwn(req.body, 'examDate') ? { examDate: req.body.examDate } : {}),
   })
-  res.status(201).json({ subject })
+  res.status(201).json(subject)
 })
 
 router.patch('/:id', async (req, res) => {
@@ -81,7 +91,7 @@ router.patch('/:id', async (req, res) => {
     return res.status(404).json({ error: 'Subject not found' })
   }
 
-  const errors = validateSubject(req.body, true)
+  const errors = validateSubject(req.body, await userToday(req.userId), true)
   if (errors.length) return sendValidationError(res, errors)
 
   const updates = Object.fromEntries(
@@ -94,7 +104,7 @@ router.patch('/:id', async (req, res) => {
   )
 
   if (!subject) return res.status(404).json({ error: 'Subject not found' })
-  res.json({ subject })
+  res.json(subject)
 })
 
 router.delete('/:id', async (req, res) => {
@@ -118,7 +128,7 @@ router.delete('/:id', async (req, res) => {
   ])
   await subject.deleteOne()
 
-  res.json({ message: 'Subject deleted' })
+  res.status(204).end()
 })
 
 module.exports = router

@@ -8,13 +8,14 @@ const Deck = require('../src/models/Deck')
 const Card = require('../src/models/Card')
 const Review = require('../src/models/Review')
 const { connectTestDB, clearTestDB, closeTestDB } = require('./helpers/db')
+const { todayIn } = require('../src/utils/dates')
 
 beforeAll(connectTestDB)
 afterEach(clearTestDB)
 afterAll(closeTestDB)
 
-async function createUser(email) {
-  const user = await User.create({ name: 'Student', email, passwordHash: 'not-used' })
+async function createUser(email, timezone = 'Asia/Kolkata') {
+  const user = await User.create({ name: 'Student', email, passwordHash: 'not-used', timezone })
   const token = jwt.sign({ userId: user._id.toString() }, process.env.JWT_SECRET)
   return { user, authorization: `Bearer ${token}` }
 }
@@ -31,10 +32,10 @@ describe('/api/subjects', () => {
       .send({ name: '  Biology  ', examDate: '2099-12-31' })
 
     expect(created.status).toBe(201)
-    expect(created.body.subject).toMatchObject({ name: 'Biology', examDate: '2099-12-31' })
+    expect(created.body).toMatchObject({ name: 'Biology', examDate: '2099-12-31' })
     const listed = await request(app).get('/api/subjects').set('Authorization', owner.authorization)
-    expect(listed.body.subjects).toHaveLength(1)
-    expect(listed.body.subjects[0]._id).toBe(created.body.subject._id)
+    expect(listed.body).toHaveLength(1)
+    expect(listed.body[0]._id).toBe(created.body._id)
   })
 
   it('rejects past and invalid exam dates', async () => {
@@ -70,10 +71,10 @@ describe('/api/subjects', () => {
     const visible = await request(app).get('/api/subjects').set('Authorization', owner.authorization)
 
     expect(ownPatch.status).toBe(200)
-    expect(ownPatch.body.subject.name).toBe('Updated subject')
+    expect(ownPatch.body.name).toBe('Updated subject')
     expect(otherPatch.status).toBe(404)
-    expect(visible.body.subjects).toHaveLength(1)
-    expect(visible.body.subjects[0]._id).toBe(ownSubject._id.toString())
+    expect(visible.body).toHaveLength(1)
+    expect(visible.body[0]._id).toBe(ownSubject._id.toString())
     expect((await Subject.findById(subject._id)).name).toBe('Private subject')
   })
 
@@ -107,12 +108,51 @@ describe('/api/subjects', () => {
       .delete(`/api/subjects/${subject._id}`)
       .set('Authorization', owner.authorization)
 
-    expect(deleted.status).toBe(200)
+    expect(deleted.status).toBe(204)
     expect(await Subject.countDocuments({ _id: subject._id })).toBe(0)
     expect(await Note.countDocuments({ subjectId: subject._id })).toBe(0)
     expect(await Deck.countDocuments({ subjectId: subject._id })).toBe(0)
     expect(await Card.countDocuments({ deckId: deck._id })).toBe(0)
     expect(await Review.countDocuments({ cardId: card._id })).toBe(0)
+  })
+
+  it('checks past exam dates in the user\'s own time zone', async () => {
+    // Pick a zone where the date today differs from UTC's whenever possible
+    const zone = todayIn('Pacific/Kiritimati') !== todayIn('UTC') ? 'Pacific/Kiritimati' : 'Pacific/Pago_Pago'
+    const owner = await createUser('owner@example.com', zone)
+    const localToday = todayIn(zone)
+    const yesterday = new Date(`${localToday}T00:00:00Z`)
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1)
+
+    const today = await request(app)
+      .post('/api/subjects')
+      .set('Authorization', owner.authorization)
+      .send({ name: 'Today exam', examDate: localToday })
+    const past = await request(app)
+      .post('/api/subjects')
+      .set('Authorization', owner.authorization)
+      .send({ name: 'Old exam', examDate: yesterday.toISOString().slice(0, 10) })
+
+    expect(today.status).toBe(201)
+    expect(past.status).toBe(400)
+    expect(past.body.details[0].message).toBe('Exam date cannot be in the past')
+  })
+
+  it('limits the name to 100 characters and allows clearing the exam date', async () => {
+    const owner = await createUser('owner@example.com')
+    const long = await request(app)
+      .post('/api/subjects')
+      .set('Authorization', owner.authorization)
+      .send({ name: 'x'.repeat(101) })
+    expect(long.status).toBe(400)
+
+    const subject = await Subject.create({ userId: owner.user._id, name: 'Maths', examDate: '2099-01-01' })
+    const cleared = await request(app)
+      .patch(`/api/subjects/${subject._id}`)
+      .set('Authorization', owner.authorization)
+      .send({ examDate: null })
+    expect(cleared.status).toBe(200)
+    expect(cleared.body.examDate).toBeNull()
   })
 
   it('requires authentication', async () => {
