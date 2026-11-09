@@ -41,7 +41,7 @@ export default function Signup() {
       if (err.response?.status === 409) {
         setErrors({ email: 'An account with this email already exists.' })
       } else {
-        toast.error(err.response?.data?.message || 'Something went wrong. Please try again.')
+        toast.error(err.response?.data?.error || 'Something went wrong. Please try again.')
       }
     } finally {
       setSubmitting(false)

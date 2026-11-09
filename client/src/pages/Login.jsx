@@ -38,7 +38,7 @@ export default function Login() {
       if (err.response?.status === 401 || err.response?.status === 400) {
         toast.error('Incorrect email or password.')
       } else {
-        toast.error(err.response?.data?.message || 'Something went wrong. Please try again.')
+        toast.error(err.response?.data?.error || 'Something went wrong. Please try again.')
       }
     } finally {
       setSubmitting(false)
