@@ -9,4 +9,34 @@ function todayIn(timezone = 'Asia/Kolkata', now = new Date()) {
   }).format(now)
 }
 
-module.exports = { todayIn }
+// How far the zone is ahead of UTC at `date`, in milliseconds (IST is +5:30)
+function zoneOffsetMs(timezone, date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value]),
+  )
+  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
+  return asUtc - Math.floor(date.getTime() / 1000) * 1000
+}
+
+// The exact moment today began (local midnight) in the student's time zone, as a Date.
+// Used to count "reviews done today" from Review.reviewedAt.
+function startOfTodayIn(timezone = 'Asia/Kolkata', now = new Date()) {
+  const [y, m, d] = todayIn(timezone, now).split('-').map(Number)
+  const midnightAsUtc = Date.UTC(y, m - 1, d)
+  // Apply the offset twice so days when clocks change (DST) still land on midnight
+  const guess = midnightAsUtc - zoneOffsetMs(timezone, new Date(midnightAsUtc))
+  return new Date(midnightAsUtc - zoneOffsetMs(timezone, new Date(guess)))
+}
+
+module.exports = { todayIn, startOfTodayIn }

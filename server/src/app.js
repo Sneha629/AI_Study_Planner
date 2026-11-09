@@ -6,6 +6,7 @@ const requireAuth = require('./middleware/auth')
 const decksRoutes = require('./routes/decks.routes')
 const cardsRoutes = require('./routes/cards.routes')
 const notesRoutes = require('./routes/notes.routes')
+const studyRoutes = require('./routes/study.routes')
 const errorHandler = require('./middleware/errorHandler')
 
 const app = express()
@@ -18,6 +19,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api', requireAuth, decksRoutes)
 app.use('/api', requireAuth, cardsRoutes)
 app.use('/api', requireAuth, notesRoutes)
+app.use('/api', requireAuth, studyRoutes)
 // Day 2+: app.use('/api/subjects', requireAuth, subjectRoutes), ...
 
 app.use((req, res) => {

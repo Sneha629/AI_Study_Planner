@@ -179,3 +179,32 @@ const form = new FormData()
 form.append('file', fileInput.files[0])
 await api.post(`/subjects/${subjectId}/notes`, form) // axios sets the multipart header itself
 ```
+
+---
+
+## Day 4: Study queue (F9), protected
+
+### GET /api/study/due
+
+The cards to study right now. Study mode (F7) shows them in this order.
+
+Optional query: `?deckId=...` (one deck) or `?subjectId=...` (one subject). Without either, all the user's decks.
+
+```json
+// 200 response
+{
+  "date": "2026-11-08",
+  "cards": [{ "...card fields...": "", "deckName": "Motion" }],
+  "counts": { "review": 12, "new": 5 },
+  "doneToday": { "review": 3, "new": 2 },
+  "limits": { "review": 100, "new": 20 }
+}
+```
+
+Rules:
+- A card is due when `dueDate <= date` (today in the user's time zone)
+- Review cards (`isNewCard: false`) come first, most overdue first; then new cards, oldest first
+- Daily limits come from the user (`dailyReviewLimit`, `dailyNewLimit`). What was already studied today is subtracted, counted over **all** decks even when the queue is filtered
+- A review with `intervalBefore: 0` is a card's first review and counts towards the new-card limit
+- `cards: []` means nothing left for today (show "All done for today 🎉")
+- Someone else's or a wrong `deckId` / `subjectId` → 404
