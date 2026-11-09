@@ -1,13 +1,14 @@
 
 import { useEffect, useState } from 'react'
 import { Link, Route, Routes, useNavigate } from 'react-router-dom'
+
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Subjects from './pages/Subjects.jsx'
+import SubjectDecks from './pages/SubjectDecks.jsx'
 import NotFound from './pages/NotFound.jsx'
 import api from './api/client.js'
-
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="/subjects" element={<Subjects />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/subjects/:id" element={<SubjectDecks />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
