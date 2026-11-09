@@ -1,6 +1,6 @@
 
-import { useEffect, useState } from 'react'
 import { Link, Route, Routes, useNavigate } from 'react-router-dom'
+import { useAuth } from './context/AuthContext.jsx'
 
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
@@ -8,28 +8,15 @@ import Signup from './pages/Signup.jsx'
 import Subjects from './pages/Subjects.jsx'
 import SubjectDecks from './pages/SubjectDecks.jsx'
 import NotFound from './pages/NotFound.jsx'
-import api from './api/client.js'
+
+import ProtectedRoute from './components/ProtectedRoute.jsx'
 
 export default function App() {
-  const [user, setUser] = useState(null)
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-
-    if (token) {
-      api.get('/auth/me')
-        .then((res) => setUser(res.data.user))
-        .catch(() => {
-          localStorage.removeItem('token')
-          setUser(null)
-        })
-    }
-  }, [])
-
   function handleLogout() {
-    localStorage.removeItem('token')
-    setUser(null)
+    logout()
     navigate('/login')
   }
 
@@ -41,43 +28,69 @@ export default function App() {
             AI Study Planner
           </Link>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            {user ? (
-              <>
-                <Link to="/subjects" className="hover:text-blue-600">
-                  Subjects
-                </Link>
-                <span className="font-medium text-slate-700">
-                  {user.name}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="rounded-lg bg-red-500 px-3 py-2 text-white hover:bg-red-600"
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="hover:text-blue-600">
-                  Log in
-                </Link>
-                <Link to="/signup" className="hover:text-blue-600">
-                  Sign up
-                </Link>
-              </>
-            )}
-          </div>
+          {user ? (
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <Link to="/subjects" className="hover:text-blue-600">
+                Subjects
+              </Link>
+
+              <span className="max-w-[8rem] truncate font-medium text-slate-700">
+                {user.name}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg bg-red-500 px-3 py-2 text-white hover:bg-red-600"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-4 text-sm">
+              <Link to="/login" className="hover:text-blue-600">
+                Log in
+              </Link>
+              <Link to="/signup" className="hover:text-blue-600">
+                Sign up
+              </Link>
+            </div>
+          )}
         </nav>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/subjects" element={<Subjects />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/subjects"
+            element={
+              <ProtectedRoute>
+                <Subjects />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/subjects/:id" element={<SubjectDecks />} />
+
+          <Route
+            path="/subjects/:id"
+            element={
+              <ProtectedRoute>
+                <SubjectDecks />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
