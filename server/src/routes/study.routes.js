@@ -6,9 +6,14 @@ const Subject = require('../models/Subject')
 const Deck = require('../models/Deck')
 const Card = require('../models/Card')
 const Review = require('../models/Review')
+const { z } = require('zod')
+const validate = require('../middleware/validate')
+const { schedule, RATINGS } = require('../services/sm2')
 const { todayIn, startOfTodayIn } = require('../utils/dates')
 
 const router = Router()
+
+const reviewSchema = z.object({ rating: z.enum(RATINGS, { error: 'Rating must be again, hard, good or easy' }) }).strict()
 
 class NotFound extends Error {
   constructor(message) {
@@ -98,6 +103,47 @@ router.get('/study/due', async (req, res) => {
     doneToday: done,
     limits: { review: user.dailyReviewLimit, new: user.dailyNewLimit },
   })
+})
+
+// F7/F8: the student rates a card in study mode. SM-2 sets its next due date and the
+// rating is logged as a Review (used for limits, streaks and stats).
+router.post('/cards/:id/review', validate(reviewSchema), async (req, res) => {
+  const { id } = req.params
+  const card = mongoose.isValidObjectId(id) ? await Card.findById(id) : null
+  const deck = card && (await Deck.findById(card.deckId).select('subjectId'))
+  if (!deck || !(await Subject.exists({ _id: deck.subjectId, userId: req.userId }))) {
+    return res.status(404).json({ error: 'Card not found' })
+  }
+
+  const user = await User.findById(req.userId).select('timezone')
+  const before = {
+    easeFactor: card.easeFactor,
+    intervalDays: card.intervalDays,
+    repetitions: card.repetitions,
+  }
+  const next = schedule(before, req.body.rating, todayIn(user?.timezone))
+
+  // Only update if nobody changed the card meanwhile, so a double click is not counted twice
+  const updated = await Card.findOneAndUpdate(
+    { _id: card._id, ...before },
+    { $set: next },
+    { returnDocument: 'after' },
+  )
+  if (!updated) {
+    return res.status(409).json({ error: 'This card was just reviewed, please refresh' })
+  }
+
+  await Review.create({
+    cardId: card._id,
+    userId: req.userId,
+    rating: req.body.rating,
+    // A new card's first review is logged with 0 so it counts towards the new-card limit
+    intervalBefore: card.isNewCard ? 0 : card.intervalDays,
+    intervalAfter: next.intervalDays,
+    easeAfter: next.easeFactor,
+  })
+
+  res.json(updated)
 })
 
 module.exports = router

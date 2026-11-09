@@ -39,4 +39,11 @@ function startOfTodayIn(timezone = 'Asia/Kolkata', now = new Date()) {
   return new Date(midnightAsUtc - zoneOffsetMs(timezone, new Date(guess)))
 }
 
-module.exports = { todayIn, startOfTodayIn }
+// "YYYY-MM-DD" plus n calendar days (dates only, so time zones cannot shift it)
+function addDays(date, n) {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+module.exports = { todayIn, startOfTodayIn, addDays }
