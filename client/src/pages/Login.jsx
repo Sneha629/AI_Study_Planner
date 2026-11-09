@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import AuthLayout from '../components/AuthLayout.jsx'
 import FormField from '../components/FormField.jsx'
+import SubmitButton from '../components/SubmitButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Login() {
@@ -35,10 +37,12 @@ export default function Login() {
       await login(form.email.trim(), form.password)
       navigate(location.state?.from?.pathname || '/', { replace: true })
     } catch (err) {
-      if (err.response?.status === 401 || err.response?.status === 400) {
+      if (!err.response) {
+        toast.error('Cannot reach the server. Is it running?')
+      } else if (err.response.status === 401) {
         toast.error('Incorrect email or password.')
       } else {
-        toast.error(err.response?.data?.message || 'Something went wrong. Please try again.')
+        toast.error(err.response?.data?.error || 'Something went wrong. Please try again.')
       }
     } finally {
       setSubmitting(false)
@@ -46,22 +50,25 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto max-w-sm">
-      <h1 className="mb-6 text-2xl font-semibold">Log in</h1>
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <FormField label="Email" name="email" type="email" value={form.email} onChange={handleChange} error={errors.email} />
-        <FormField label="Password" name="password" type="password" value={form.password} onChange={handleChange} error={errors.password} />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
-        >
-          {submitting ? 'Logging in...' : 'Log in'}
-        </button>
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Log in to continue your revision."
+      footer={
+        <>
+          New here?{' '}
+          <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
+            Sign up
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <FormField label="Email" name="email" type="email" placeholder="you@example.com" value={form.email} onChange={handleChange} error={errors.email} />
+        <FormField label="Password" name="password" type="password" placeholder="Enter your password" value={form.password} onChange={handleChange} error={errors.password} />
+        <SubmitButton loading={submitting} loadingText="Logging in...">
+          Log in
+        </SubmitButton>
       </form>
-      <p className="mt-4 text-sm">
-        New here? <Link to="/signup" className="text-indigo-600 underline">Sign up</Link>
-      </p>
-    </div>
+    </AuthLayout>
   )
 }

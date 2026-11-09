@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import AuthLayout from '../components/AuthLayout.jsx'
 import FormField from '../components/FormField.jsx'
+import SubmitButton from '../components/SubmitButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Signup() {
@@ -38,10 +40,12 @@ export default function Signup() {
       await signup(form.name.trim(), form.email.trim(), form.password)
       navigate(location.state?.from?.pathname || '/', { replace: true })
     } catch (err) {
-      if (err.response?.status === 409) {
+      if (!err.response) {
+        toast.error('Cannot reach the server. Is it running?')
+      } else if (err.response.status === 409) {
         setErrors({ email: 'An account with this email already exists.' })
       } else {
-        toast.error(err.response?.data?.message || 'Something went wrong. Please try again.')
+        toast.error(err.response?.data?.error || 'Something went wrong. Please try again.')
       }
     } finally {
       setSubmitting(false)
@@ -49,24 +53,27 @@ export default function Signup() {
   }
 
   return (
-    <div className="mx-auto max-w-sm">
-      <h1 className="mb-6 text-2xl font-semibold">Sign up</h1>
+    <AuthLayout
+      title="Create your account"
+      subtitle="Start turning your notes into flashcards."
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
+            Log in
+          </Link>
+        </>
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <FormField label="Name" name="name" value={form.name} onChange={handleChange} error={errors.name} />
-        <FormField label="Email" name="email" type="email" value={form.email} onChange={handleChange} error={errors.email} />
-        <FormField label="Password" name="password" type="password" value={form.password} onChange={handleChange} error={errors.password} />
-        <FormField label="Confirm password" name="confirm" type="password" value={form.confirm} onChange={handleChange} error={errors.confirm} />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
-        >
-          {submitting ? 'Signing up...' : 'Sign up'}
-        </button>
+        <FormField label="Name" name="name" placeholder="Your name" value={form.name} onChange={handleChange} error={errors.name} />
+        <FormField label="Email" name="email" type="email" placeholder="you@example.com" value={form.email} onChange={handleChange} error={errors.email} />
+        <FormField label="Password" name="password" type="password" placeholder="At least 8 characters" value={form.password} onChange={handleChange} error={errors.password} />
+        <FormField label="Confirm password" name="confirm" type="password" placeholder="Re-enter your password" value={form.confirm} onChange={handleChange} error={errors.confirm} />
+        <SubmitButton loading={submitting} loadingText="Creating account...">
+          Sign up
+        </SubmitButton>
       </form>
-      <p className="mt-4 text-sm">
-        Already have an account? <Link to="/login" className="text-indigo-600 underline">Log in</Link>
-      </p>
-    </div>
+    </AuthLayout>
   )
 }
