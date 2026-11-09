@@ -1,3 +1,4 @@
+
 import { Link, Route, Routes } from 'react-router-dom'
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
@@ -5,6 +6,8 @@ import Signup from './pages/Signup.jsx'
 import NotFound from './pages/NotFound.jsx'
 import SubjectDecks from './pages/SubjectDecks.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
+
+
 
 export default function App() {
   return (
@@ -27,10 +30,18 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+
           <Route path="/subjects/:id" element={<ProtectedRoute><SubjectDecks /></ProtectedRoute>} />
+
+          <Route path="/subjects/:id" element={<SubjectDecks />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>
   )
+
 }
+
+
+
+
