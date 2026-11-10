@@ -184,8 +184,13 @@ export default function Navbar() {
   }
 
   return (
-    <header ref={mobileRef} className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+    // Floating rounded bar: stands out from colourful page backgrounds
+    <header className="sticky top-0 z-40 px-3 pt-3 sm:px-6">
+      <div
+        ref={mobileRef}
+        className="mx-auto max-w-6xl rounded-2xl border border-white/70 bg-white/85 shadow-lg shadow-indigo-900/5 ring-1 ring-slate-900/5 backdrop-blur-xl"
+      >
+      <nav className="flex h-14 items-center justify-between gap-4 px-3 sm:px-4">
         <div className="flex items-center gap-8">
           <Logo />
           {user && (
@@ -232,7 +237,7 @@ export default function Navbar() {
       </nav>
 
       {user && mobileOpen && (
-        <div className="border-t border-slate-200/70 bg-white px-4 pb-4 pt-3 md:hidden">
+        <div className="border-t border-slate-200/70 px-3 pb-3 pt-3 md:hidden">
           <div className="mb-3 flex items-center gap-3 rounded-xl bg-linear-to-br from-indigo-50 to-violet-50 p-3">
             <Avatar name={user.name} size="h-10 w-10 text-sm" />
             <div className="min-w-0">
@@ -258,6 +263,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
+      </div>
     </header>
   )
 }
