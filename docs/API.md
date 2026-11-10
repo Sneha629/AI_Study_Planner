@@ -236,3 +236,44 @@ SM-2 rules (`server/src/services/sm2.js`):
 Next interval: 1st correct → 1 day, 2nd → 6 days, after that → previous interval × ease (rounded). Ease never goes below 1.3; a new card starts at 2.5.
 
 Errors: bad `rating` or extra fields → 400 · wrong id or someone else's card → 404 · the same card reviewed twice at the same moment (double click) → 409
+
+---
+
+## Day 6: AI flashcards from notes (F6), protected
+
+Flow: upload a note (F5) → `generate` (AI preview, nothing saved) → student edits/unticks → `cards` (save).
+
+### POST /api/notes/:id/generate
+
+```json
+// request
+{ "count": 20 }   // 10 | 20 | 30
+// 200 response
+{
+  "noteId": "...",
+  "suggestedDeckName": "Chapter 3 motion",
+  "cards": [{ "front": "What is inertia?", "back": "Resistance to a change in motion" }],
+  "usedAllText": true
+}
+```
+
+- Takes 5–30 seconds. Long notes are split into up to 4 parts spread across the note; `usedAllText: false` means some parts were skipped
+- At most 10 generations per user per 10 minutes → 429
+- AI busy / free limit used up / AI not set up → 429, 503 or 502 with a readable `error` to show the user
+
+### POST /api/notes/:id/cards
+
+```json
+// request: new deck
+{ "deckName": "Chapter 3 motion", "cards": [{ "front": "...", "back": "..." }] }
+// or existing deck in the same subject
+{ "deckId": "...", "cards": [...] }
+// 201 response
+{ "deck": { "_id": "...", "name": "Chapter 3 motion", "cardCount": 20, "...": "" }, "saved": 20 }
+```
+
+- Send exactly one of `deckId` or `deckName`; 1–50 cards; same `front`/`back` limits as manual cards
+- Saved cards have `source: "ai"`, `noteId`, and are due today, so they show up in study mode immediately
+- A deck from another subject or user → 404
+
+Server config (`server/.env`): `LLM_API_KEY` (required), optional `LLM_BASE_URL`, `LLM_MODEL` (default `gemini-3.5-flash-lite`), `LLM_FALLBACK_MODEL` (default `gemini-3.8-flash`, tried when the main model is busy).

@@ -3,9 +3,10 @@
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   const status = err.status || 500
-  if (status >= 500) console.error(err)
+  if (status >= 500 && !err.expose) console.error(err)
+  // 5xx messages stay hidden unless the error was written for users (err.expose)
   res.status(status).json({
-    error: status >= 500 ? 'Something went wrong, please try again' : err.message,
+    error: status >= 500 && !err.expose ? 'Something went wrong, please try again' : err.message,
   })
 }
 

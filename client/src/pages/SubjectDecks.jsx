@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   getDecks,
@@ -234,6 +234,21 @@ export default function SubjectDecks() {
             <span className="rounded-lg border border-white/15 bg-white/10 px-3 py-2">
               {totalCards} learning cards
             </span>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              to={`/subjects/${id}/notes`}
+              className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-indigo-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-indigo-50"
+            >
+              ✨ Make cards from notes
+            </Link>
+            <Link
+              to={`/study?subjectId=${id}`}
+              className="rounded-xl border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+            >
+              Study this subject →
+            </Link>
           </div>
         </div>
 
