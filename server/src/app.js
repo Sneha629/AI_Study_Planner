@@ -9,6 +9,7 @@ const cardsRoutes = require('./routes/cards.routes')
 const notesRoutes = require('./routes/notes.routes')
 const studyRoutes = require('./routes/study.routes')
 const errorHandler = require('./middleware/errorHandler')
+const sharedRoutes = require('./routes/shared.routes')
 
 const app = express()
 
@@ -17,6 +18,7 @@ app.use(express.json({ limit: '1mb' }))
 
 app.use('/api/health', healthRoutes)
 app.use('/api/auth', authRoutes)
+app.use('/api/shared', sharedRoutes)
 app.use('/api/subjects', requireAuth, subjectRoutes)
 app.use('/api', requireAuth, decksRoutes)
 app.use('/api', requireAuth, cardsRoutes)

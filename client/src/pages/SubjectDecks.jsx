@@ -6,6 +6,8 @@ import {
   createDeck,
   renameDeck,
   deleteDeck,
+  shareDeck,
+  unshareDeck,
 } from '../api/decks.js'
 
 function BookIcon() {
@@ -71,6 +73,7 @@ export default function SubjectDecks() {
   const [editingName, setEditingName] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [sharingId, setSharingId] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -202,6 +205,22 @@ export default function SubjectDecks() {
       toast.error(error.response?.data?.error || 'Could not delete deck')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleShare = async (deckId) => {
+    try {
+      setSharingId(deckId)
+
+      const data = await shareDeck(deckId)
+      const shareUrl = data.shareUrl || `${window.location.origin}/shared/${data.shareToken}`
+
+      await navigator.clipboard.writeText(shareUrl)
+      toast.success('Share link copied!')
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Could not create share link')
+    } finally {
+      setSharingId(null)
     }
   }
 
@@ -470,6 +489,33 @@ export default function SubjectDecks() {
                         </div>
 
                         <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleShare(deck._id)}
+                            disabled={sharingId === deck._id}
+                            className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
+                          >
+                            {sharingId === deck._id ? 'Sharing...' : 'Share'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                setSharingId(deck._id)
+                                await unshareDeck(deck._id)
+                                toast.success('Deck sharing disabled successfully')
+                              } catch (error) {
+                                toast.error(error.response?.data?.error || 'Could not disable sharing')
+                              } finally {
+                                setSharingId(null)
+                              }
+                            }}
+                            disabled={sharingId === deck._id}
+                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                          >
+                            {sharingId === deck._id ? 'Please wait...' : 'Unshare'}
+                          </button>
                           <button
                             type="button"
                             onClick={() => startRename(deck)}

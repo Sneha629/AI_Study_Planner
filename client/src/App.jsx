@@ -9,6 +9,7 @@ import SubjectDecks from './pages/SubjectDecks.jsx'
 import Study from './pages/Study.jsx'
 import Notes from './pages/Notes.jsx'
 import NotFound from './pages/NotFound.jsx'
+import SharedDeck from './pages/SharedDeck.jsx'
 
 import Navbar from './components/Navbar.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -55,6 +56,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/shared/:token" element={<SharedDeck />} />
 
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
