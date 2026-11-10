@@ -25,4 +25,16 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 })
 
-module.exports = { signupSchema, loginSchema }
+const updateProfileSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Name is required').max(50, 'Name must be at most 50 characters').optional(),
+    timezone: timezone.optional(),
+    dailyReviewLimit: z.number().int().min(1).max(500).optional(),
+    dailyNewLimit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict()
+  .refine((profile) => Object.keys(profile).length > 0, {
+    message: 'At least one field is required',
+  })
+
+module.exports = { signupSchema, loginSchema, updateProfileSchema }
