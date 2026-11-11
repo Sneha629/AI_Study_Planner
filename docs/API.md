@@ -417,3 +417,16 @@ Requires a valid bearer token. Example response:
   }]
 }
 ```
+
+### PATCH /api/auth/password (protected)
+
+```json
+// request
+{ "currentPassword": "old-password", "newPassword": "at-least-8-chars" }
+// 200 response
+{ "message": "Password updated" }
+```
+
+- Wrong `currentPassword` → 400 with `details[0].field = "currentPassword"`
+- `newPassword` 8–72 characters and different from the current one; other fields → 400
+- Rate limited like login (20 tries per 15 minutes)

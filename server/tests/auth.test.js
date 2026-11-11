@@ -173,3 +173,45 @@ describe('PATCH /api/auth/me', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('PATCH /api/auth/password', () => {
+  let token
+
+  beforeEach(async () => {
+    const res = await request(app).post('/api/auth/signup').send(newUser)
+    token = res.body.token
+  })
+
+  const change = (body, t = token) =>
+    request(app).patch('/api/auth/password').set('Authorization', `Bearer ${t}`).send(body)
+
+  it('changes the password so only the new one logs in', async () => {
+    const res = await change({ currentPassword: 'password123', newPassword: 'brand-new-pass' })
+    expect(res.status).toBe(200)
+
+    const oldLogin = await request(app).post('/api/auth/login').send({ email: newUser.email, password: 'password123' })
+    expect(oldLogin.status).toBe(401)
+    const newLogin = await request(app).post('/api/auth/login').send({ email: newUser.email, password: 'brand-new-pass' })
+    expect(newLogin.status).toBe(200)
+  })
+
+  it('rejects a wrong current password and keeps the old one', async () => {
+    const res = await change({ currentPassword: 'not-my-password', newPassword: 'brand-new-pass' })
+    expect(res.status).toBe(400)
+    expect(res.body.details[0].field).toBe('currentPassword')
+
+    const login = await request(app).post('/api/auth/login').send({ email: newUser.email, password: 'password123' })
+    expect(login.status).toBe(200)
+  })
+
+  it('rejects a short or unchanged new password and extra fields', async () => {
+    expect((await change({ currentPassword: 'password123', newPassword: 'short' })).status).toBe(400)
+    expect((await change({ currentPassword: 'password123', newPassword: 'password123' })).status).toBe(400)
+    expect((await change({ currentPassword: 'password123', newPassword: 'brand-new-pass', email: 'x@y.z' })).status).toBe(400)
+  })
+
+  it('requires a token', async () => {
+    const res = await request(app).patch('/api/auth/password').send({ currentPassword: 'password123', newPassword: 'brand-new-pass' })
+    expect(res.status).toBe(401)
+  })
+})
