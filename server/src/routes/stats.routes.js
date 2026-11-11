@@ -2,7 +2,6 @@ const { Router } = require('express')
 const Card = require('../models/Card')
 const Deck = require('../models/Deck')
 const Review = require('../models/Review')
-const Streak = require('../models/Streak')
 const Subject = require('../models/Subject')
 const User = require('../models/User')
 
@@ -42,13 +41,11 @@ router.get('/stats/overview', async (req, res) => {
   const timezone = user.timezone || 'Asia/Kolkata'
   const today = getLocalDate(new Date(), timezone)
   const heatmapStart = dateDaysAgo(today, HEATMAP_DAYS - 1)
-  const reviewRangeStart = new Date(Date.now() - (HEATMAP_DAYS + 2) * DAY_MS)
 
-  const [subjects, streak, reviewCounts] = await Promise.all([
+  const [subjects, reviewCounts] = await Promise.all([
     Subject.find({ userId: req.userId }).select('name examDate').lean(),
-    Streak.findOne({ userId: req.userId }).select('currentStreak longestStreak lastStudyDate').lean(),
     Review.aggregate([
-      { $match: { userId: user._id, reviewedAt: { $gte: reviewRangeStart } } },
+      { $match: { userId: user._id } },
       {
         $group: {
           _id: {
@@ -59,6 +56,27 @@ router.get('/stats/overview', async (req, res) => {
       },
     ]),
   ])
+
+  const studyDates = reviewCounts.map(({ _id }) => _id).sort()
+  const studyDateSet = new Set(studyDates)
+  let longestStreak = 0
+  let runningStreak = 0
+  let previousDate = null
+  for (const date of studyDates) {
+    runningStreak = previousDate && dateDaysAgo(date, 1) === previousDate
+      ? runningStreak + 1
+      : 1
+    longestStreak = Math.max(longestStreak, runningStreak)
+    previousDate = date
+  }
+
+  const studiedToday = studyDateSet.has(today)
+  let currentStreak = 0
+  let currentDate = studiedToday ? today : dateDaysAgo(today, 1)
+  while (studyDateSet.has(currentDate)) {
+    currentStreak += 1
+    currentDate = dateDaysAgo(currentDate, 1)
+  }
 
   const heatmap = reviewCounts
     .filter(({ _id }) => _id >= heatmapStart && _id <= today)
@@ -79,7 +97,7 @@ router.get('/stats/overview', async (req, res) => {
             _id: '$deckId',
             totalCards: { $sum: 1 },
             learnedCards: { $sum: { $cond: [{ $eq: ['$isNewCard', false] }, 1, 0] } },
-            masteredCards: { $sum: { $cond: [{ $gte: ['$repetitions', 3] }, 1, 0] } },
+            masteredCards: { $sum: { $cond: [{ $gte: ['$intervalDays', 21] }, 1, 0] } },
             dueToday: { $sum: { $cond: [{ $lte: ['$dueDate', today] }, 1, 0] } },
           },
         },
@@ -105,9 +123,9 @@ router.get('/stats/overview', async (req, res) => {
   res.json({
     date: today,
     streak: {
-      current: streak?.currentStreak || 0,
-      longest: streak?.longestStreak || 0,
-      studiedToday: streak?.lastStudyDate === today,
+      current: currentStreak,
+      longest: longestStreak,
+      studiedToday,
     },
     heatmap,
     subjects: subjects.map(({ _id, name, examDate }) => ({
