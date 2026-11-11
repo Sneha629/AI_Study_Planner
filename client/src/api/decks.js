@@ -53,3 +53,9 @@ export const copySharedDeck = async (token, subjectId) => {
   })
   return response.data
 }
+
+// Get exam plan for a subject
+export const getExamPlan = async (subjectId) => {
+  const response = await api.get(`/subjects/${subjectId}/plan`)
+  return response.data
+}

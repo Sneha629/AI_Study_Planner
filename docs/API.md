@@ -91,6 +91,65 @@ Rules:
 - `examDate` in the past → 400 `"Exam date cannot be in the past"` (compare in the user's time zone; today is allowed)
 - Wrong id or someone else's subject → 404
 
+### GET /api/subjects/:id/plan (F10)
+
+Returns an exam preparation plan for the authenticated user's subject.
+
+Requires a valid bearer token.
+
+Example response (`200`):
+
+```json
+{
+  "daysLeft": 12,
+  "totalCards": 40,
+  "newCardsLeft": 20,
+  "dueToday": 6,
+  "newPerDay": 3,
+  "status": "on-track",
+  "schedule": [
+    {
+      "date": "2026-11-12",
+      "newCards": 3,
+      "reviews": 0
+    },
+    {
+      "date": "2026-11-13",
+      "newCards": 3,
+      "reviews": 3
+    }
+  ]
+}
+```
+
+Response fields:
+
+| Field | Description |
+| --- | --- |
+| `daysLeft` | Days remaining until the exam, based on the user's time zone. `null` when no exam date is set. |
+| `totalCards` | Total cards across all decks in the subject. |
+| `newCardsLeft` | Cards that have not yet been reviewed. |
+| `dueToday` | Cards due on or before today, including overdue cards. |
+| `newPerDay` | New cards required per day, rounded up, to finish at least 3 days before the exam. `null` when no exam date is set or no preparation days are available. |
+| `status` | `on-track`, `behind`, or `no-exam`. |
+| `schedule` | Daily new-card and review counts for the next 7 calendar days. |
+
+Planning rules:
+
+- New cards should be completed at least 3 days before the exam so they can be revised.
+- `newPerDay` = ceiling of `newCardsLeft / (daysLeft - 3)`, when available days are positive.
+- `on-track` means the required daily new-card count does not exceed the user's `dailyNewLimit`.
+- `behind` means the required daily count exceeds the limit, or pending new cards cannot be completed before the 3-day revision buffer.
+- `no-exam` is returned when `examDate` is null. In this case, `daysLeft` and `newPerDay` are null.
+- Existing review cards are counted on their due date; overdue cards count as due today.
+- Newly planned cards contribute their first revision to the following day.
+- The schedule displays only the next 7 calendar days; `newPerDay` is calculated across the full available preparation period.
+
+Errors:
+
+- Invalid subject ID or another user's subject → `404`
+- Missing or invalid token → `401`
+
 ---
 
 ## Day 2: Decks (F2), all protected

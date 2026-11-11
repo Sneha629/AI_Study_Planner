@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -8,6 +9,7 @@ import {
   deleteDeck,
   shareDeck,
   unshareDeck,
+  getExamPlan,
 } from '../api/decks.js'
 
 function BookIcon() {
@@ -75,6 +77,9 @@ export default function SubjectDecks() {
   const [deletingId, setDeletingId] = useState(null)
   const [sharingId, setSharingId] = useState(null)
 
+  const [examPlan, setExamPlan] = useState(null)
+  const [planLoading, setPlanLoading] = useState(true)
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -92,6 +97,29 @@ export default function SubjectDecks() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  useEffect(() => {
+    let cancelled = false
+    setPlanLoading(true)
+    setExamPlan(null)
+
+    getExamPlan(id)
+      .then((data) => {
+        if (!cancelled) setExamPlan(data)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          toast.error(error.response?.data?.error || 'Could not load exam plan')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPlanLoading(false)
       })
 
     return () => {
@@ -224,6 +252,21 @@ export default function SubjectDecks() {
     }
   }
 
+  const formatScheduleDate = (dateString) => {
+    const date = new Date(`${dateString}T00:00:00`)
+    return date.toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
+  }
+
+  const getExamStatus = () => {
+    if (examPlan?.status === 'behind') return 'Behind schedule'
+    if (examPlan?.status === 'on-track') return 'On track'
+    return 'No exam date set'
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 pb-10">
       {/* Hero section */}
@@ -316,6 +359,129 @@ export default function SubjectDecks() {
             {decks.length ? Math.round(totalCards / decks.length) : 0}
           </p>
           <p className="mt-1 text-xs text-slate-400">Per study deck</p>
+        </div>
+      </section>
+
+      {/* Exam Plan */}
+      <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
+              SMART STUDY SCHEDULE
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">
+              📅 Exam Plan
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Your personalized daily card and revision targets.
+            </p>
+          </div>
+          {examPlan && examPlan.status !== 'no-exam' && (
+            <span
+              className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${
+                examPlan.status === 'on-track'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {examPlan.status === 'on-track' ? '✓ On track' : '⚠ Behind'}
+            </span>
+          )}
+        </div>
+
+        <div className="p-5 sm:p-6">
+          {planLoading ? (
+            <div className="animate-pulse space-y-4">
+              <div className="h-6 w-1/2 rounded bg-slate-200" />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[1, 2, 3, 4].map((item) => (
+                  <div key={item} className="h-20 rounded-xl bg-slate-100" />
+                ))}
+              </div>
+            </div>
+          ) : !examPlan ? (
+            <p className="text-sm text-slate-500">
+              Exam plan could not be loaded. Please refresh the page.
+            </p>
+          ) : examPlan.status === 'no-exam' ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-6 text-center">
+              <p className="text-lg font-semibold text-slate-800">
+                No exam date set
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Add an exam date to your subject to get a personalized study plan.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-lg font-bold text-slate-900">
+                  Exam in {examPlan.daysLeft} {examPlan.daysLeft === 1 ? 'day' : 'days'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {getExamStatus()}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl bg-indigo-50 p-4">
+                  <p className="text-xs font-medium text-indigo-600">New cards left</p>
+                  <p className="mt-2 text-2xl font-bold text-indigo-950">
+                    {examPlan.newCardsLeft}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-blue-50 p-4">
+                  <p className="text-xs font-medium text-blue-600">Daily new target</p>
+                  <p className="mt-2 text-2xl font-bold text-blue-950">
+                    {examPlan.newPerDay ?? '—'}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-emerald-50 p-4">
+                  <p className="text-xs font-medium text-emerald-600">Due today</p>
+                  <p className="mt-2 text-2xl font-bold text-emerald-950">
+                    {examPlan.dueToday}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-violet-50 p-4">
+                  <p className="text-xs font-medium text-violet-600">Total cards</p>
+                  <p className="mt-2 text-2xl font-bold text-violet-950">
+                    {examPlan.totalCards}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="mb-3 font-bold text-slate-900">
+                  Next 7 days schedule
+                </h3>
+
+                <div className="space-y-3">
+                  {examPlan.schedule?.map((day) => (
+                    <div
+                      key={day.date}
+                      className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <p className="font-semibold text-slate-800">
+                        {formatScheduleDate(day.date)}
+                      </p>
+
+                      <div className="flex flex-wrap gap-3 text-sm">
+                        <span className="rounded-lg bg-indigo-100 px-3 py-1.5 font-medium text-indigo-700">
+                          {day.newCards} new cards
+                        </span>
+                        <span className="rounded-lg bg-emerald-100 px-3 py-1.5 font-medium text-emerald-700">
+                          {day.reviews} reviews
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -491,7 +657,7 @@ export default function SubjectDecks() {
                           <p className="text-xs text-slate-400">Study cards</p>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={() => handleShare(deck._id)}
