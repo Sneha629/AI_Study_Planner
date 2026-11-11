@@ -1,4 +1,3 @@
-
 import { Route, Routes } from 'react-router-dom'
 
 import Home from './pages/Home.jsx'
@@ -11,6 +10,7 @@ import Notes from './pages/Notes.jsx'
 import NotFound from './pages/NotFound.jsx'
 import DeckCards from './pages/DeckCards.jsx'
 import SharedDeck from './pages/SharedDeck.jsx'
+import Settings from './pages/Settings.jsx'
 
 import Navbar from './components/Navbar.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -57,6 +57,16 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/shared/:token" element={<SharedDeck />} />
 
           <Route path="/login" element={<Login />} />
