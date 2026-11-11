@@ -6,7 +6,7 @@ const Deck = require('../models/Deck')
 const Card = require('../models/Card')
 const Review = require('../models/Review')
 const User = require('../models/User')
-const { todayIn } = require('../utils/dates')
+const { todayIn, addDays } = require('../utils/dates')
 
 const router = Router()
 const subjectFields = ['name', 'examDate']
@@ -73,6 +73,123 @@ router.get('/', async (req, res) => {
   const subjects = await Subject.find({ userId: req.userId }).sort({ createdAt: -1 })
   res.json(subjects)
 })
+
+router.get('/:id/plan', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ error: 'Subject not found' })
+  }
+
+  const subject = await Subject.findOne({
+    _id: req.params.id,
+    userId: req.userId,
+  })
+
+  if (!subject) {
+    return res.status(404).json({ error: 'Subject not found' })
+  }
+
+  const user = await User.findById(req.userId).select('timezone dailyNewLimit')
+  const timezone = user?.timezone || 'Asia/Kolkata'
+  const dailyNewLimit = user?.dailyNewLimit ?? 20
+  const today = todayIn(timezone)
+
+  const decks = await Deck.find({ subjectId: subject._id }).select('_id')
+  const deckIds = decks.map((deck) => deck._id)
+
+  const cards = deckIds.length
+    ? await Card.find({ deckId: { $in: deckIds } })
+    : []
+
+  const totalCards = cards.length
+  const newCards = cards.filter((card) => card.isNewCard)
+  const newCardsLeft = newCards.length
+
+  const dueToday = cards.filter(
+  (card) => card.dueDate && card.dueDate <= today
+).length
+
+  const schedule = Array.from({ length: 7 }, (_, index) => ({
+    date: addDays(today, index),
+    newCards: 0,
+    reviews: 0,
+  }))
+
+  const scheduleByDate = new Map(
+    schedule.map((day) => [day.date, day])
+  )
+
+  // Existing review cards: overdue cards are due today.
+  for (const card of cards) {
+    if (card.isNewCard || !card.dueDate) continue
+
+    const reviewDate = card.dueDate <= today ? today : card.dueDate
+    const day = scheduleByDate.get(reviewDate)
+
+    if (day) day.reviews += 1
+  }
+
+  if (!subject.examDate) {
+    return res.json({
+      daysLeft: null,
+      totalCards,
+      newCardsLeft,
+       dueToday,
+      newPerDay: null,
+      status: 'no-exam',
+      schedule,
+    })
+  }
+
+  const daysLeft = Math.max(
+    0,
+    Math.round(
+      (new Date(`${subject.examDate}T00:00:00Z`) -
+        new Date(`${today}T00:00:00Z`)) / 86400000
+    )
+  )
+
+  // All new cards must be completed at least 3 days before the exam.
+  const availableDays = Math.max(0, daysLeft - 3)
+
+  const newPerDay = newCardsLeft === 0
+    ? 0
+    : availableDays > 0
+      ? Math.ceil(newCardsLeft / availableDays)
+      : null
+
+  const status = newCardsLeft > 0 &&
+    (newPerDay === null || newPerDay > dailyNewLimit)
+    ? 'behind'
+    : 'on-track'
+
+  // Distribute new cards across the available days.
+  let remainingNewCards = newCardsLeft
+
+  for (let index = 0; index < Math.min(availableDays, 7); index++) {
+    const count = Math.min(newPerDay || 0, remainingNewCards)
+    const day = schedule[index]
+
+    day.newCards = count
+    remainingNewCards -= count
+
+    // First revision is scheduled for the following day.
+    const firstReviewDay = scheduleByDate.get(addDays(day.date, 1))
+    if (firstReviewDay) {
+      firstReviewDay.reviews += count
+    }
+  }
+
+  return res.json({
+    daysLeft,
+    totalCards,
+    newCardsLeft,
+     dueToday,
+    newPerDay,
+    status,
+    schedule,
+  })
+})
+
 
 router.post('/', async (req, res) => {
   const errors = validateSubject(req.body, await userToday(req.userId))
