@@ -47,6 +47,20 @@ describe('chatJson', () => {
     expect(global.fetch.mock.calls.map(modelOf)).toEqual(['main-model', 'main-model', 'backup-model'])
   })
 
+  it('walks through a comma-separated list of fallback models, one try each', async () => {
+    process.env.LLM_FALLBACK_MODEL = 'backup-1, backup-2,main-model'
+    global.fetch = jest
+      .fn()
+      .mockReturnValueOnce(reply(503))
+      .mockReturnValueOnce(reply(503))
+      .mockReturnValueOnce(reply(503))
+      .mockReturnValueOnce(reply(200, '{"ok":true}'))
+
+    await expect(chatJson({ system: 's', user: 'u' })).resolves.toEqual({ ok: true })
+    // main twice, then each backup once; the duplicate main-model is not tried again
+    expect(global.fetch.mock.calls.map(modelOf)).toEqual(['main-model', 'main-model', 'backup-1', 'backup-2'])
+  })
+
   it('does not retry when the free limit is used up', async () => {
     global.fetch = jest.fn(() => reply(429))
 

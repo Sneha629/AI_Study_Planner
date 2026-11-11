@@ -335,7 +335,7 @@ Flow: upload a note (F5) → `generate` (AI preview, nothing saved) → student 
 - Saved cards have `source: "ai"`, `noteId`, and are due today, so they show up in study mode immediately
 - A deck from another subject or user → 404
 
-Server config (`server/.env`): `LLM_API_KEY` (required), optional `LLM_BASE_URL`, `LLM_MODEL` (default `gemini-3.5-flash-lite`), `LLM_FALLBACK_MODEL` (default `gemini-3.8-flash`, tried when the main model is busy).
+Server config (`server/.env`): `LLM_API_KEY` (required), optional `LLM_BASE_URL`, `LLM_MODEL` (default `gemini-3.5-flash-lite`), `LLM_FALLBACK_MODEL` (comma-separated list, default `gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.8-flash`, tried in order when the main model is busy).
 
 ---
 
