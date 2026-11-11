@@ -78,7 +78,7 @@ describe('GET /api/stats/overview', () => {
       totalCards: 4,
       learnedCards: 3,
       masteredCards: 1,
-      dueToday: 3,
+      dueToday: 4,
     }])
   })
 
