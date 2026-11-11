@@ -9,6 +9,7 @@ import SubjectDecks from './pages/SubjectDecks.jsx'
 import Study from './pages/Study.jsx'
 import Notes from './pages/Notes.jsx'
 import NotFound from './pages/NotFound.jsx'
+import DeckCards from './pages/DeckCards.jsx'
 
 import Navbar from './components/Navbar.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -64,6 +65,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <SubjectDecks />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/subjects/:id/decks/:deckId"
+            element={
+              <ProtectedRoute>
+                <DeckCards />
               </ProtectedRoute>
             }
           />

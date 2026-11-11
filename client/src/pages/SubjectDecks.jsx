@@ -454,9 +454,12 @@ export default function SubjectDecks() {
                         </span>
                       </div>
 
-                      <h3 className="mt-5 truncate text-lg font-bold text-slate-900">
+                      <Link
+                        to={`/subjects/${id}/decks/${deck._id}`}
+                        className="mt-5 block truncate text-lg font-bold text-slate-900 hover:text-indigo-600"
+                      >
                         {deck.name}
-                      </h3>
+                      </Link>
                       <p className="mt-1 text-sm text-slate-500">
                         Your personal learning collection
                       </p>
