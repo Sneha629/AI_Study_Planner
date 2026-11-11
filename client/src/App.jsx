@@ -10,6 +10,7 @@ import Notes from './pages/Notes.jsx'
 import NotFound from './pages/NotFound.jsx'
 import DeckCards from './pages/DeckCards.jsx'
 import SharedDeck from './pages/SharedDeck.jsx'
+import Progress from './pages/Progress.jsx'
 import Settings from './pages/Settings.jsx'
 import Quiz from './pages/Quiz.jsx'
 
@@ -97,6 +98,15 @@ export default function App() {
     </ProtectedRoute>
   }
 />
+
+          <Route
+            path="/progress"
+            element={
+              <ProtectedRoute>
+                <Progress />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="*" element={<NotFound />} />
         </Routes>
