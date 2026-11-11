@@ -430,3 +430,175 @@ Requires a valid bearer token. Example response:
 - Wrong `currentPassword` → 400 with `details[0].field = "currentPassword"`
 - `newPassword` 8–72 characters and different from the current one; other fields → 400
 - Rate limited like login (20 tries per 15 minutes)
+
+---
+
+## AI Quiz (F12), protected
+
+Generate an AI-powered multiple-choice quiz from a deck's flashcards, submit answers, and view previous quiz attempts.
+
+### POST /api/decks/:id/quiz
+
+Generates a quiz using the front and back of the deck's cards.
+
+Request:
+
+```json
+{ "count": 5 }
+```
+
+- `count` must be either `5` or `10`.
+- The deck must contain at least 4 cards.
+- The AI generates questions using only the supplied flashcards.
+- Each question has exactly 4 distinct options and one correct answer.
+- Options are shuffled on the server.
+- The quiz attempt is saved in the database.
+- The response does not expose `correctIndex` before submission.
+
+Example response (`201`):
+
+```json
+{
+  "_id": "6730000000000000000000aa",
+  "deckId": "6730000000000000000000bb",
+  "total": 5,
+  "questions": [
+    {
+      "question": "What is velocity?",
+      "options": [
+        "Speed with direction",
+        "Distance travelled",
+        "Rate of change of distance",
+        "Total displacement"
+      ]
+    }
+  ]
+}
+```
+
+Errors:
+
+- Invalid count or extra request fields → `400`
+- Deck has fewer than 4 cards → `400` `"Add at least 4 cards to make a quiz"`
+- Wrong deck ID or another user's deck → `404`
+- AI busy, unavailable or unable to generate a valid quiz → readable AI error
+- More than 10 quiz generations per user in 10 minutes → `429`
+
+### POST /api/quizzes/:id/submit
+
+Submits the user's answers and calculates the score.
+
+Request:
+
+```json
+{
+  "answers": [2, 0, 3, 1, 2]
+}
+```
+
+- `answers` contains the selected option index (0–3) for each question.
+- The number of answers must exactly match the quiz's `total`.
+- Each quiz can be submitted only once.
+
+Example response (`200`):
+
+```json
+{
+  "score": 4,
+  "total": 5,
+  "results": [
+    {
+      "question": "What is velocity?",
+      "options": [
+        "Speed with direction",
+        "Distance travelled",
+        "Rate of change of distance",
+        "Total displacement"
+      ],
+      "correctIndex": 0,
+      "chosen": 2,
+      "correct": false
+    }
+  ]
+}
+```
+
+Response fields:
+
+| Field | Description |
+| --- | --- |
+| `score` | Number of correctly answered questions |
+| `total` | Total questions in the quiz |
+| `results` | Question-wise answer evaluation |
+| `correctIndex` | Index of the correct option |
+| `chosen` | Index selected by the user |
+| `correct` | Whether the selected answer is correct |
+
+Errors:
+
+- Invalid answer format or incorrect number of answers → `400`
+- Quiz not found or belongs to another user → `404`
+- Quiz already submitted → `409`
+
+**### GET /api/quizzes/:id**
+
+Returns the details of a submitted quiz attempt, including the user's selected answers and the correct answers.
+
+Example response (`200`):
+
+```json
+{
+  "_id": "6730000000000000000000aa",
+  "deckId": "6730000000000000000000bb",
+  "score": 4,
+  "total": 5,
+  "results": [
+    {
+      "question": "What is velocity?",
+      "options": [
+        "Speed with direction",
+        "Distance travelled",
+        "Rate of change of distance",
+        "Total displacement"
+      ],
+      "correctIndex": 0,
+      "chosen": 2,
+      "correct": false
+    }
+  ]
+}
+```
+
+Rules:
+
+- Only the owner can view the quiz attempt.
+- Correct answers are available only after submission.
+- Invalid quiz ID or another user's quiz → `404`
+- Quiz not yet submitted → `409` with `"This quiz has not been submitted yet"`.
+
+
+
+### GET /api/decks/:id/quizzes
+
+Returns the authenticated user's previous quiz attempts for a deck, newest first.
+
+Example response (`200`):
+
+```json
+[
+  {
+    "_id": "6730000000000000000000aa",
+    "score": 4,
+    "total": 5,
+    "createdAt": "2026-11-11T14:30:00.000Z"
+  }
+]
+```
+
+Rules:
+
+- Only the authenticated user's quiz attempts are returned.
+- Results are sorted by creation date, newest first.
+- Wrong deck ID or another user's deck → `404`.
+
+All three endpoints require a valid bearer token.
