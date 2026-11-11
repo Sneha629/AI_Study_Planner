@@ -337,9 +337,9 @@ Flow: upload a note (F5) → `generate` (AI preview, nothing saved) → student 
 
 Server config (`server/.env`): `LLM_API_KEY` (required), optional `LLM_BASE_URL`, `LLM_MODEL` (default `gemini-3.5-flash-lite`), `LLM_FALLBACK_MODEL` (default `gemini-3.8-flash`, tried when the main model is busy).
 
-# API
+---
 
-## Auth
+## Settings (F1), protected
 
 ### PATCH /api/auth/me
 

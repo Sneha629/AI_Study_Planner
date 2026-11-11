@@ -14,7 +14,14 @@ const errorHandler = require('./middleware/errorHandler')
 
 const app = express()
 
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
+// CLIENT_URL can list several sites, comma separated (e.g. the Vercel site and localhost).
+// Trailing slashes are dropped because browsers send the origin without one.
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((url) => url.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+
+app.use(cors({ origin: allowedOrigins }))
 app.use(express.json({ limit: '1mb' }))
 
 app.use('/api/health', healthRoutes)

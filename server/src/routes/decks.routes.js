@@ -37,7 +37,8 @@ router.post('/decks/:id/share', async (req, res) => {
     await deck.save()
   }
 
-  const baseUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '')
+  // Share links point at the first site listed in CLIENT_URL
+  const baseUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/+$/, '')
   const shareUrl = `${baseUrl}/shared/${deck.shareToken}`
 
   return res.json({
