@@ -27,3 +27,29 @@ export const deleteDeck = async (deckId) => {
   const response = await api.delete(`/decks/${deckId}`)
   return response.data
 }
+
+// Enable deck sharing
+export const shareDeck = async (deckId) => {
+  const response = await api.post(`/decks/${deckId}/share`)
+  return response.data
+}
+
+// Disable deck sharing
+export const unshareDeck = async (deckId) => {
+  const response = await api.delete(`/decks/${deckId}/share`)
+  return response.data
+}
+
+// Get a publicly shared deck
+export const getSharedDeck = async (token) => {
+  const response = await api.get(`/shared/${token}`)
+  return response.data
+}
+
+// Copy a shared deck into user's subject
+export const copySharedDeck = async (token, subjectId) => {
+  const response = await api.post(`/shared/${token}/copy`, {
+    subjectId,
+  })
+  return response.data
+}

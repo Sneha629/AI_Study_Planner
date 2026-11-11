@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit')
 const User = require('../models/User')
 const requireAuth = require('../middleware/auth')
 const validate = require('../middleware/validate')
-const { signupSchema, loginSchema } = require('../validators/auth.validators')
+const { signupSchema, loginSchema, updateProfileSchema } = require('../validators/auth.validators')
 
 const router = Router()
 
@@ -55,6 +55,14 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
 // F1: current user and settings
 router.get('/me', requireAuth, async (req, res) => {
   const user = await User.findById(req.userId)
+  if (!user) {
+    return res.status(401).json({ error: 'Your session has expired, please log in again' })
+  }
+  res.json({ user })
+})
+
+router.patch('/me', requireAuth, validate(updateProfileSchema), async (req, res) => {
+  const user = await User.findByIdAndUpdate(req.userId, { $set: req.body }, { new: true, runValidators: true })
   if (!user) {
     return res.status(401).json({ error: 'Your session has expired, please log in again' })
   }

@@ -43,7 +43,7 @@ describe('Decks API', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns all decks with cardCount', async () => {
+  it('returns all decks as a direct array with cardCount', async () => {
     const deck = await Deck.create({
       subjectId,
       name: 'Arrays',
@@ -61,20 +61,22 @@ describe('Decks API', () => {
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(200)
-    expect(res.body.decks).toHaveLength(1)
-    expect(res.body.decks[0].name).toBe('Arrays')
-    expect(res.body.decks[0].cardCount).toBe(1)
+    expect(Array.isArray(res.body)).toBe(true)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].name).toBe('Arrays')
+    expect(res.body[0].cardCount).toBe(1)
   })
 
-  it('creates a new deck', async () => {
+  it('creates a new deck and returns a direct deck object', async () => {
     const res = await request(app)
       .post(`/api/subjects/${subjectId}/decks`)
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Linked Lists' })
 
     expect(res.status).toBe(201)
-    expect(res.body.deck.name).toBe('Linked Lists')
-    expect(res.body.deck.cardCount).toBe(0)
+    expect(res.body.name).toBe('Linked Lists')
+    expect(res.body.cardCount).toBe(0)
+    expect(res.body.deck).toBeUndefined()
 
     const deck = await Deck.findOne({ name: 'Linked Lists' })
     expect(deck).toBeDefined()
@@ -89,7 +91,7 @@ describe('Decks API', () => {
     expect(res.status).toBe(400)
   })
 
-  it('renames an existing deck', async () => {
+  it('renames an existing deck and returns a direct deck object', async () => {
     const deck = await Deck.create({
       subjectId,
       name: 'Old Name',
@@ -101,10 +103,11 @@ describe('Decks API', () => {
       .send({ name: 'New Name' })
 
     expect(res.status).toBe(200)
-    expect(res.body.deck.name).toBe('New Name')
+    expect(res.body.name).toBe('New Name')
+    expect(res.body.deck).toBeUndefined()
   })
 
-  it('deletes a deck along with its cards and reviews', async () => {
+  it('deletes a deck with its cards and reviews and returns 204', async () => {
     const deck = await Deck.create({
       subjectId,
       name: 'Algorithms',
@@ -130,10 +133,45 @@ describe('Decks API', () => {
       .delete(`/api/decks/${deck._id}`)
       .set('Authorization', `Bearer ${token}`)
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(204)
+    expect(res.text).toBe('')
     expect(await Deck.countDocuments({ _id: deck._id })).toBe(0)
     expect(await Card.countDocuments({ deckId: deck._id })).toBe(0)
     expect(await Review.countDocuments({ cardId: card._id })).toBe(0)
+  })
+
+  it('returns 404 for an invalid subject ID when getting decks', async () => {
+    const res = await request(app)
+      .get('/api/subjects/invalid-id/decks')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for an invalid subject ID when creating a deck', async () => {
+    const res = await request(app)
+      .post('/api/subjects/invalid-id/decks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Arrays' })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for an invalid deck ID when renaming', async () => {
+    const res = await request(app)
+      .patch('/api/decks/invalid-id')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'New Name' })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for an invalid deck ID when deleting', async () => {
+    const res = await request(app)
+      .delete('/api/decks/invalid-id')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(404)
   })
 
   it('does not allow another user to access the subject decks', async () => {
@@ -153,5 +191,58 @@ describe('Decks API', () => {
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(404)
+  })
+
+  it('does not allow another user to rename a deck', async () => {
+    const secondUser = await User.create({
+      name: 'Other User',
+      email: 'other@example.com',
+      passwordHash: 'hashed-password',
+    })
+
+    const otherSubject = await Subject.create({
+      userId: secondUser._id,
+      name: 'Other Subject',
+    })
+
+    const deck = await Deck.create({
+      subjectId: otherSubject._id,
+      name: 'Private Deck',
+    })
+
+    const res = await request(app)
+      .patch(`/api/decks/${deck._id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Changed Name' })
+
+    expect(res.status).toBe(404)
+
+    const unchangedDeck = await Deck.findById(deck._id)
+    expect(unchangedDeck.name).toBe('Private Deck')
+  })
+
+  it('does not allow another user to delete a deck', async () => {
+    const secondUser = await User.create({
+      name: 'Other User',
+      email: 'other@example.com',
+      passwordHash: 'hashed-password',
+    })
+
+    const otherSubject = await Subject.create({
+      userId: secondUser._id,
+      name: 'Other Subject',
+    })
+
+    const deck = await Deck.create({
+      subjectId: otherSubject._id,
+      name: 'Private Deck',
+    })
+
+    const res = await request(app)
+      .delete(`/api/decks/${deck._id}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(404)
+    expect(await Deck.findById(deck._id)).not.toBeNull()
   })
 })

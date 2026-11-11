@@ -95,3 +95,81 @@ describe('GET /api/auth/me', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('PATCH /api/auth/me', () => {
+  let authorization
+
+  beforeEach(async () => {
+    const signup = await request(app).post('/api/auth/signup').send(newUser)
+    authorization = `Bearer ${signup.body.token}`
+  })
+
+  it('updates the current user settings and returns the user', async () => {
+    const res = await request(app)
+      .patch('/api/auth/me')
+      .set('Authorization', authorization)
+      .send({ name: 'Sneha Rao', timezone: 'Asia/Kolkata', dailyReviewLimit: 150, dailyNewLimit: 25 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.user).toMatchObject({
+      name: 'Sneha Rao',
+      email: 'sneha@example.com',
+      timezone: 'Asia/Kolkata',
+      dailyReviewLimit: 150,
+      dailyNewLimit: 25,
+    })
+    expect(res.body.user.passwordHash).toBeUndefined()
+  })
+
+  it('rejects an invalid time zone', async () => {
+    const res = await request(app)
+      .patch('/api/auth/me')
+      .set('Authorization', authorization)
+      .send({ timezone: 'Mars/Base' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.details.map((detail) => detail.field)).toContain('timezone')
+  })
+
+  it.each([
+    ['dailyReviewLimit', 0],
+    ['dailyReviewLimit', 501],
+    ['dailyNewLimit', 0],
+    ['dailyNewLimit', 101],
+  ])('rejects %s outside its range', async (field, value) => {
+    const res = await request(app)
+      .patch('/api/auth/me')
+      .set('Authorization', authorization)
+      .send({ [field]: value })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects email updates', async () => {
+    const res = await request(app)
+      .patch('/api/auth/me')
+      .set('Authorization', authorization)
+      .send({ email: 'other@example.com' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects password updates', async () => {
+    const res = await request(app)
+      .patch('/api/auth/me')
+      .set('Authorization', authorization)
+      .send({ password: 'new-password-123' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an empty update', async () => {
+    const res = await request(app).patch('/api/auth/me').set('Authorization', authorization).send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects requests without a token', async () => {
+    const res = await request(app).patch('/api/auth/me').send({ name: 'Updated name' })
+    expect(res.status).toBe(401)
+  })
+})
