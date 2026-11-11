@@ -3,13 +3,15 @@
 //   LLM_API_KEY       the key (never sent to the browser)
 //   LLM_BASE_URL      default: Gemini's OpenAI-compatible endpoint
 //   LLM_MODEL         default: gemini-3.5-flash-lite (fast, worked best in testing)
-//   LLM_FALLBACK_MODEL  tried when the main model is busy or slow; default: gemini-3.8-flash
+//   LLM_FALLBACK_MODEL  comma-separated models tried in order when the main one is busy or slow
+//                       (default below); set it to an empty value to turn fallbacks off
 //   LLM_REASONING     optional "none" | "low" | "medium" | "high" (less = faster)
 
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite'
-const DEFAULT_FALLBACK_MODEL = 'gemini-3.8-flash'
-const TIMEOUT_MS = 60_000
+// Free Gemini models get busy at peak times; several backups keep AI working (checked 11 Nov 2026)
+const DEFAULT_FALLBACK_MODELS = 'gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.8-flash'
+const TIMEOUT_MS = 45_000
 
 // Worth trying the backup model for these: busy, overloaded, server error, timeout
 const RETRY_WITH_FALLBACK = new Set([500, 502, 503, 504])
@@ -28,8 +30,11 @@ function config() {
   if (!apiKey) throw new LlmError('AI is not set up on the server yet (LLM_API_KEY is missing)', 503)
   const baseUrl = (process.env.LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/?$/, '/')
   const model = process.env.LLM_MODEL || DEFAULT_MODEL
-  const fallback = process.env.LLM_FALLBACK_MODEL ?? DEFAULT_FALLBACK_MODEL
-  const models = fallback && fallback !== model ? [model, fallback] : [model]
+  const fallbacks = (process.env.LLM_FALLBACK_MODEL ?? DEFAULT_FALLBACK_MODELS)
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean)
+  const models = [...new Set([model, ...fallbacks])]
   return { apiKey, baseUrl, models, reasoning: process.env.LLM_REASONING }
 }
 
@@ -41,16 +46,16 @@ function errorFor(status) {
   return new LlmError('The AI service had a problem. Please try again.', 502)
 }
 
-const ATTEMPTS_PER_MODEL = 2
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // Sends a system + user message and returns the reply parsed as JSON.
-// Busy or flaky answers are retried once, then the same request goes to the fallback model.
+// The main model gets two tries; each fallback model then gets one, in order.
 async function chatJson({ system, user }) {
   const { apiKey, baseUrl, models, reasoning } = config()
   let lastError
-  for (const model of models) {
-    for (let attempt = 1; attempt <= ATTEMPTS_PER_MODEL; attempt++) {
+  for (const [index, model] of models.entries()) {
+    const attempts = index === 0 ? 2 : 1
+    for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
         return await askModel({ apiKey, baseUrl, model, reasoning, system, user })
       } catch (err) {
