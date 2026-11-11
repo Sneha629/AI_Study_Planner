@@ -37,7 +37,7 @@ Every error has the same shape:
 { "name": "Sneha", "email": "sneha@example.com", "password": "min8chars", "timezone": "Asia/Kolkata" }
 ```
 
-- `name` 1â€“50 chars, `email` valid, `password` at least 8 chars, `timezone` optional (default `Asia/Kolkata`)
+- `name` 1–50 chars, `email` valid, `password` at least 8 chars, `timezone` optional (default `Asia/Kolkata`)
 
 ```json
 // 201 response
@@ -87,9 +87,9 @@ Subject object:
 | DELETE | `/api/subjects/:id` | none | 204, also deletes its notes, decks, cards and reviews |
 
 Rules:
-- `name` 1â€“100 chars
-- `examDate` in the past â†’ 400 `"Exam date cannot be in the past"` (compare in the user's time zone; today is allowed)
-- Wrong id or someone else's subject â†’ 404
+- `name` 1–100 chars
+- `examDate` in the past → 400 `"Exam date cannot be in the past"` (compare in the user's time zone; today is allowed)
+- Wrong id or someone else's subject → 404
 
 ### GET /api/subjects/:id/plan (F10)
 
@@ -147,8 +147,8 @@ Planning rules:
 
 Errors:
 
-- Invalid subject ID or another user's subject â†’ `404`
-- Missing or invalid token â†’ `401`
+- Invalid subject ID or another user's subject → `404`
+- Missing or invalid token → `401`
 
 ---
 
@@ -170,7 +170,7 @@ Deck object:
 | DELETE | `/api/decks/:id` | none | 204, also deletes its cards and their reviews |
 
 Rules:
-- `name` 1â€“100 chars
+- `name` 1–100 chars
 - A deck belongs to the user through its subject: check `subject.userId === req.userId`, otherwise 404
 
 ---
@@ -198,11 +198,11 @@ The SM-2 fields (`easeFactor`, `intervalDays`, `repetitions`, `dueDate`, `isNewC
 | DELETE | `/api/cards/:id` | none | 204, also deletes its reviews |
 
 Rules:
-- `front` 1â€“500 chars, `back` 1â€“2000 chars, both trimmed
-- Any other field in the body â†’ 400
+- `front` 1–500 chars, `back` 1–2000 chars, both trimmed
+- Any other field in the body → 400
 - A new card has `source: "manual"`, `isNewCard: true` and `dueDate` = today in the user's time zone, so it shows up in study mode right away
 - Editing a card changes only its text; SM-2 progress is kept
-- A card belongs to the user through deck â†’ subject; wrong id or someone else's card â†’ 404
+- A card belongs to the user through deck → subject; wrong id or someone else's card → 404
 
 ---
 
@@ -226,10 +226,10 @@ Note object (list and upload responses):
 | DELETE | `/api/notes/:id` | none | 204; cards made from it are kept (their `noteId` becomes `null`) |
 
 Rules:
-- Only `.pdf` and `.txt`, at most 5 MB â†’ otherwise 400
-- A PDF with no text (a scanned photo of pages) â†’ 400 `"No text found in this PDF..."`
-- Password-protected or broken PDF â†’ 400
-- Wrong id or someone else's subject or note â†’ 404
+- Only `.pdf` and `.txt`, at most 5 MB → otherwise 400
+- A PDF with no text (a scanned photo of pages) → 400 `"No text found in this PDF..."`
+- Password-protected or broken PDF → 400
+- Wrong id or someone else's subject or note → 404
 
 Frontend upload example:
 
@@ -265,8 +265,8 @@ Rules:
 - Review cards (`isNewCard: false`) come first, most overdue first; then new cards, oldest first
 - Daily limits come from the user (`dailyReviewLimit`, `dailyNewLimit`). What was already studied today is subtracted, counted over **all** decks even when the queue is filtered
 - A review with `intervalBefore: 0` is a card's first review and counts towards the new-card limit
-- `cards: []` means nothing left for today (show "All done for today ðŸŽ‰")
-- Someone else's or a wrong `deckId` / `subjectId` â†’ 404
+- `cards: []` means nothing left for today (show "All done for today 🎉")
+- Someone else's or a wrong `deckId` / `subjectId` → 404
 
 ---
 
@@ -288,19 +288,19 @@ SM-2 rules (`server/src/services/sm2.js`):
 | Button | What happens |
 | --- | --- |
 | Again | Forgot it: repetitions reset to 0, due tomorrow, ease unchanged |
-| Hard | Next interval as below, ease âˆ’0.14 |
+| Hard | Next interval as below, ease −0.14 |
 | Good | Next interval as below, ease unchanged |
 | Easy | Next interval as below, ease +0.1 |
 
-Next interval: 1st correct â†’ 1 day, 2nd â†’ 6 days, after that â†’ previous interval Ã— ease (rounded). Ease never goes below 1.3; a new card starts at 2.5.
+Next interval: 1st correct → 1 day, 2nd → 6 days, after that → previous interval × ease (rounded). Ease never goes below 1.3; a new card starts at 2.5.
 
-Errors: bad `rating` or extra fields â†’ 400 Â· wrong id or someone else's card â†’ 404 Â· the same card reviewed twice at the same moment (double click) â†’ 409
+Errors: bad `rating` or extra fields → 400 · wrong id or someone else's card → 404 · the same card reviewed twice at the same moment (double click) → 409
 
 ---
 
 ## Day 6: AI flashcards from notes (F6), protected
 
-Flow: upload a note (F5) â†’ `generate` (AI preview, nothing saved) â†’ student edits/unticks â†’ `cards` (save).
+Flow: upload a note (F5) → `generate` (AI preview, nothing saved) → student edits/unticks → `cards` (save).
 
 ### POST /api/notes/:id/generate
 
@@ -316,9 +316,9 @@ Flow: upload a note (F5) â†’ `generate` (AI preview, nothing saved) â†�
 }
 ```
 
-- Takes 5â€“30 seconds. Long notes are split into up to 4 parts spread across the note; `usedAllText: false` means some parts were skipped
-- At most 10 generations per user per 10 minutes â†’ 429
-- AI busy / free limit used up / AI not set up â†’ 429, 503 or 502 with a readable `error` to show the user
+- Takes 5–30 seconds. Long notes are split into up to 4 parts spread across the note; `usedAllText: false` means some parts were skipped
+- At most 10 generations per user per 10 minutes → 429
+- AI busy / free limit used up / AI not set up → 429, 503 or 502 with a readable `error` to show the user
 
 ### POST /api/notes/:id/cards
 
@@ -331,9 +331,9 @@ Flow: upload a note (F5) â†’ `generate` (AI preview, nothing saved) â†�
 { "deck": { "_id": "...", "name": "Chapter 3 motion", "cardCount": 20, "...": "" }, "saved": 20 }
 ```
 
-- Send exactly one of `deckId` or `deckName`; 1â€“50 cards; same `front`/`back` limits as manual cards
+- Send exactly one of `deckId` or `deckName`; 1–50 cards; same `front`/`back` limits as manual cards
 - Saved cards have `source: "ai"`, `noteId`, and are due today, so they show up in study mode immediately
-- A deck from another subject or user â†’ 404
+- A deck from another subject or user → 404
 
 Server config (`server/.env`): `LLM_API_KEY` (required), optional `LLM_BASE_URL`, `LLM_MODEL` (default `gemini-3.5-flash-lite`), `LLM_FALLBACK_MODEL` (default `gemini-3.8-flash`, tried when the main model is busy).
 
@@ -349,7 +349,7 @@ At least one supported field is required:
 
 | Field | Constraints |
 | --- | --- |
-| `name` | 1â€“50 characters |
+| `name` | 1–50 characters |
 | `timezone` | Valid IANA time zone, such as `Asia/Kolkata` |
 | `dailyReviewLimit` | Integer from 1 to 500 |
 | `dailyNewLimit` | Integer from 1 to 100 |
@@ -418,6 +418,18 @@ Requires a valid bearer token. Example response:
 }
 ```
 
+### PATCH /api/auth/password (protected)
+
+```json
+// request
+{ "currentPassword": "old-password", "newPassword": "at-least-8-chars" }
+// 200 response
+{ "message": "Password updated" }
+```
+
+- Wrong `currentPassword` → 400 with `details[0].field = "currentPassword"`
+- `newPassword` 8–72 characters and different from the current one; other fields → 400
+- Rate limited like login (20 tries per 15 minutes)
 
 ---
 
@@ -466,11 +478,11 @@ Example response (`201`):
 
 Errors:
 
-- Invalid count or extra request fields â†’ `400`
-- Deck has fewer than 4 cards â†’ `400` `"Add at least 4 cards to make a quiz"`
-- Wrong deck ID or another user's deck â†’ `404`
-- AI busy, unavailable or unable to generate a valid quiz â†’ readable AI error
-- More than 10 quiz generations per user in 10 minutes â†’ `429`
+- Invalid count or extra request fields → `400`
+- Deck has fewer than 4 cards → `400` `"Add at least 4 cards to make a quiz"`
+- Wrong deck ID or another user's deck → `404`
+- AI busy, unavailable or unable to generate a valid quiz → readable AI error
+- More than 10 quiz generations per user in 10 minutes → `429`
 
 ### POST /api/quizzes/:id/submit
 
@@ -484,7 +496,7 @@ Request:
 }
 ```
 
-- `answers` contains the selected option index (0â€“3) for each question.
+- `answers` contains the selected option index (0–3) for each question.
 - The number of answers must exactly match the quiz's `total`.
 - Each quiz can be submitted only once.
 
@@ -524,9 +536,9 @@ Response fields:
 
 Errors:
 
-- Invalid answer format or incorrect number of answers â†’ `400`
-- Quiz not found or belongs to another user â†’ `404`
-- Quiz already submitted â†’ `409`
+- Invalid answer format or incorrect number of answers → `400`
+- Quiz not found or belongs to another user → `404`
+- Quiz already submitted → `409`
 
 **### GET /api/quizzes/:id**
 
@@ -561,8 +573,8 @@ Rules:
 
 - Only the owner can view the quiz attempt.
 - Correct answers are available only after submission.
-- Invalid quiz ID or another user's quiz â†’ `404`
-- Quiz not yet submitted â†’ `409` with `"This quiz has not been submitted yet"`.
+- Invalid quiz ID or another user's quiz → `404`
+- Quiz not yet submitted → `409` with `"This quiz has not been submitted yet"`.
 
 
 
@@ -587,6 +599,6 @@ Rules:
 
 - Only the authenticated user's quiz attempts are returned.
 - Results are sorted by creation date, newest first.
-- Wrong deck ID or another user's deck â†’ `404`.
+- Wrong deck ID or another user's deck → `404`.
 
 All three endpoints require a valid bearer token.
