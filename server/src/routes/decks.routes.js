@@ -1,4 +1,4 @@
-
+const crypto = require('crypto')
 const { Router } = require('express')
 const mongoose = require('mongoose')
 
@@ -8,6 +8,73 @@ const Card = require('../models/Card')
 const Review = require('../models/Review')
 
 const router = Router()
+
+// POST generate or retrieve a deck share link
+router.post('/decks/:id/share', async (req, res) => {
+  const { id } = req.params
+
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(404).json({ error: 'Deck not found' })
+  }
+
+  const deck = await Deck.findById(id)
+
+  if (!deck) {
+    return res.status(404).json({ error: 'Deck not found' })
+  }
+
+  const subject = await Subject.findOne({
+    _id: deck.subjectId,
+    userId: req.userId,
+  })
+
+  if (!subject) {
+    return res.status(404).json({ error: 'Deck not found' })
+  }
+
+  if (!deck.shareToken) {
+    deck.shareToken = crypto.randomBytes(24).toString('hex')
+    await deck.save()
+  }
+
+  const baseUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '')
+  const shareUrl = `${baseUrl}/shared/${deck.shareToken}`
+
+  return res.json({
+    shareToken: deck.shareToken,
+    shareUrl,
+  })
+})
+
+// DELETE disable deck sharing
+router.delete('/decks/:id/share', async (req, res) => {
+  const { id } = req.params
+
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(404).json({ error: 'Deck not found' })
+  }
+
+  const deck = await Deck.findById(id)
+
+  if (!deck) {
+    return res.status(404).json({ error: 'Deck not found' })
+  }
+
+  const subject = await Subject.findOne({
+    _id: deck.subjectId,
+    userId: req.userId,
+  })
+
+  if (!subject) {
+    return res.status(404).json({ error: 'Deck not found' })
+  }
+
+  deck.shareToken = undefined
+  await deck.save()
+
+  return res.json({ message: 'Deck sharing disabled' })
+})
+
 
 // GET all decks of a subject with card count
 router.get('/subjects/:id/decks', async (req, res) => {
