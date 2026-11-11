@@ -10,6 +10,7 @@ import Notes from './pages/Notes.jsx'
 import NotFound from './pages/NotFound.jsx'
 import DeckCards from './pages/DeckCards.jsx'
 import SharedDeck from './pages/SharedDeck.jsx'
+import Progress from './pages/Progress.jsx'
 import Settings from './pages/Settings.jsx'
 
 import Navbar from './components/Navbar.jsx'
@@ -85,6 +86,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <DeckCards />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/progress"
+            element={
+              <ProtectedRoute>
+                <Progress />
               </ProtectedRoute>
             }
           />
