@@ -5,7 +5,12 @@ const rateLimit = require('express-rate-limit')
 const User = require('../models/User')
 const requireAuth = require('../middleware/auth')
 const validate = require('../middleware/validate')
-const { signupSchema, loginSchema, updateProfileSchema } = require('../validators/auth.validators')
+const {
+  signupSchema,
+  loginSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+} = require('../validators/auth.validators')
 
 const router = Router()
 
@@ -67,6 +72,26 @@ router.patch('/me', requireAuth, validate(updateProfileSchema), async (req, res)
     return res.status(401).json({ error: 'Your session has expired, please log in again' })
   }
   res.json({ user })
+})
+
+// F1: change password. The current password is checked first, so a stolen
+// logged-in session alone cannot lock the owner out. Rate limited like login.
+router.patch('/password', authLimiter, requireAuth, validate(changePasswordSchema), async (req, res) => {
+  const user = await User.findById(req.userId)
+  if (!user) {
+    return res.status(401).json({ error: 'Your session has expired, please log in again' })
+  }
+  if (!(await bcrypt.compare(req.body.currentPassword, user.passwordHash))) {
+    // 400, not 401: the session is fine, only the typed password is wrong
+    return res.status(400).json({
+      error: 'Current password is incorrect',
+      details: [{ field: 'currentPassword', message: 'Current password is incorrect' }],
+    })
+  }
+
+  user.passwordHash = await bcrypt.hash(req.body.newPassword, 10)
+  await user.save()
+  res.json({ message: 'Password updated' })
 })
 
 module.exports = router

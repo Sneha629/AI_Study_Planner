@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import api from '../api/client.js'
 import FormField from '../components/FormField.jsx'
+import ChangePassword from '../components/ChangePassword.jsx'
 import SubmitButton from '../components/SubmitButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -142,6 +143,8 @@ export default function Settings() {
           </SubmitButton>
         </form>
       </div>
+
+      <ChangePassword />
     </div>
   )
 }
