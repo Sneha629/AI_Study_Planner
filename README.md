@@ -98,4 +98,4 @@ F1 Auth · F2 Subjects and decks · F3 Exam date · F4 Manual cards · F5 Upload
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, commit and pull request workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, commit and pull request workflow, and [docs/API.md](docs/API.md) for request and response shapes.
