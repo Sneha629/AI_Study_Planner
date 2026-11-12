@@ -220,7 +220,7 @@ Note object (list and upload responses):
 
 | Method | Route | Body | Response |
 | --- | --- | --- | --- |
-| GET | `/api/subjects/:id/notes` | none | 200 `[note, ...]`, newest first, without `extractedText` |
+| GET | `/api/subjects/:id/notes` | none | 200 `[note, ...]`, newest first, without `extractedText`, with `cardCount` (cards saved from it) |
 | POST | `/api/subjects/:id/notes` | `multipart/form-data` with one file in the field `file` | 201 `note`, without `extractedText` |
 | GET | `/api/notes/:id` | none | 200 `note` with `extractedText` |
 | DELETE | `/api/notes/:id` | none | 204; cards made from it are kept (their `noteId` becomes `null`) |
@@ -312,11 +312,18 @@ Flow: upload a note (F5) → `generate` (AI preview, nothing saved) → student 
   "noteId": "...",
   "suggestedDeckName": "Chapter 3 motion",
   "cards": [{ "front": "What is inertia?", "back": "Resistance to a change in motion" }],
-  "usedAllText": true
+  "usedAllText": true,
+  "alreadyMade": 10,
+  "skipped": 2,
+  "coveredAll": true,
+  "lastDeckId": "..."
 }
 ```
 
-- Takes 5–30 seconds. Long notes are split into up to 4 parts spread across the note; `usedAllText: false` means some parts were skipped
+- Takes 5–30 seconds. 20 and 30 cards run as parallel batches of 10
+- **Generate more:** calling it again on the same note gives new cards. The AI is told the questions already saved from this note (`alreadyMade`), and repeats (even reworded) are dropped (`skipped`). `lastDeckId` is the deck the newest cards from this note went into, or `null`
+- Long notes are split into parts; each call uses up to 4 parts, continuing where the last call stopped. `usedAllText: false` = only part of the note was used this time; `coveredAll: true` = this call reached the end of the note (the next one starts again from the beginning)
+- Only repeats came back → 422 `"…This note looks fully covered."`
 - At most 10 generations per user per 10 minutes → 429
 - AI busy / free limit used up / AI not set up → 429, 503 or 502 with a readable `error` to show the user
 

@@ -7,6 +7,8 @@ const noteSchema = new Schema(
     fileType: { type: String, enum: ['pdf', 'txt'], required: true },
     // Raw text kept so cards can be regenerated
     extractedText: { type: String, required: true },
+    // F6 "Generate more": which part of the text the next AI generation starts from
+    nextChunk: { type: Number, default: 0, min: 0 },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 )

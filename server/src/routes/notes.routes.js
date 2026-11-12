@@ -72,8 +72,8 @@ async function findOwnNote(noteId, userId, fields) {
 
 // List and upload responses leave out the full text, which can be very long
 function summary(note) {
-  const { extractedText, ...rest } = note.toJSON()
-  return { ...rest, textLength: extractedText.length }
+  const { extractedText, nextChunk, ...rest } = note.toJSON()
+  return { ...rest, textLength: extractedText.length, cardCount: 0 }
 }
 
 // F5: list a subject's notes, newest first
@@ -85,7 +85,18 @@ router.get('/subjects/:id/notes', async (req, res) => {
     { $match: { subjectId: new mongoose.Types.ObjectId(req.params.id) } },
     { $sort: { createdAt: -1, _id: -1 } },
     { $addFields: { textLength: { $strLenCP: '$extractedText' } } },
-    { $project: { extractedText: 0, __v: 0 } },
+    // How many cards were already saved from each note ("12 cards made")
+    {
+      $lookup: {
+        from: Card.collection.name,
+        localField: '_id',
+        foreignField: 'noteId',
+        pipeline: [{ $count: 'n' }],
+        as: 'made',
+      },
+    },
+    { $addFields: { cardCount: { $ifNull: [{ $first: '$made.n' }, 0] } } },
+    { $project: { extractedText: 0, made: 0, nextChunk: 0, __v: 0 } },
   ])
   res.json(notes)
 })
@@ -136,12 +147,28 @@ router.post('/notes/:id/generate', generateLimiter, validate(generateSchema), as
   const note = await findOwnNote(req.params.id, req.userId)
   if (!note) return res.status(404).json({ error: 'Note not found' })
 
-  const { cards, usedAllText } = await generateCards(note.extractedText, req.body.count)
+  // Cards already saved from this note, newest first: the AI is told to make different ones
+  const made = await Card.find({ noteId: note._id }).sort({ createdAt: -1, _id: -1 }).select('front deckId').lean()
+
+  const result = await generateCards(note.extractedText, req.body.count, {
+    avoid: made.map((c) => c.front),
+    startChunk: note.nextChunk || 0,
+  })
+  // Next time, continue with the parts of the note that come after these
+  await Note.updateOne({ _id: note._id }, { nextChunk: result.nextChunk })
+
+  // Offer the deck the newest cards from this note went into, if it still exists in this subject
+  const lastDeckId = made[0] && (await Deck.exists({ _id: made[0].deckId, subjectId: note.subjectId }))?._id
+
   res.json({
     noteId: note._id,
     suggestedDeckName: deckNameFrom(note.fileName),
-    cards,
-    usedAllText,
+    cards: result.cards,
+    usedAllText: result.usedAllText,
+    alreadyMade: made.length,
+    skipped: result.skipped,
+    coveredAll: result.coveredAll,
+    lastDeckId: lastDeckId ?? null,
   })
 })
 
