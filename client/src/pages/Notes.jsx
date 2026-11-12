@@ -107,7 +107,7 @@ function Dropzone({ onFile, uploading, progress }) {
   )
 }
 
-function Generating({ fileName }) {
+function Generating({ fileName, more }) {
   const [line, setLine] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setLine((l) => (l + 1) % LOADING_LINES.length), 2200)
@@ -119,7 +119,10 @@ function Generating({ fileName }) {
         <SparkIcon className="h-8 w-8 animate-spin [animation-duration:3s]" />
       </div>
       <p className="mt-6 text-lg font-semibold text-slate-900">{LOADING_LINES[line]}</p>
-      <p className="mt-1 text-sm text-slate-500">Making flashcards from “{fileName}”. This usually takes 10–30 seconds.</p>
+      <p className="mt-1 text-sm text-slate-500">
+        {more ? 'Making new cards, different from the ones you already have, ' : 'Making flashcards '}
+        from “{fileName}”. This usually takes 10–30 seconds.
+      </p>
     </div>
   )
 }
@@ -127,9 +130,11 @@ function Generating({ fileName }) {
 // Review AI cards: edit, untick or delete, choose the deck, then save
 function Preview({ note, result, decks, onCancel, onRegenerate, onSaved }) {
   const [cards, setCards] = useState(() => result.cards.map((c, i) => ({ ...c, id: i, keep: true })))
-  const [mode, setMode] = useState('new')
+  // "Generate more": start with the deck the earlier cards from this note went into
+  const lastDeck = decks.find((d) => d._id === result.lastDeckId)
+  const [mode, setMode] = useState(lastDeck ? 'existing' : 'new')
   const [deckName, setDeckName] = useState(result.suggestedDeckName)
-  const [deckId, setDeckId] = useState(decks[0]?._id ?? '')
+  const [deckId, setDeckId] = useState(lastDeck?._id ?? decks[0]?._id ?? '')
   const [saving, setSaving] = useState(false)
 
   const kept = cards.filter((c) => c.keep && c.front.trim() && c.back.trim())
@@ -162,11 +167,22 @@ function Preview({ note, result, decks, onCancel, onRegenerate, onSaved }) {
             {result.cards.length} cards from “{note.fileName}”
           </h2>
           <p className="mt-1 text-sm text-slate-500">Edit anything that looks wrong and untick cards you don’t want.</p>
-          {!result.usedAllText && (
-            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Your note is long, so cards were made from parts spread across it.
+          {result.alreadyMade > 0 && (
+            <p className="mt-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+              You already have {result.alreadyMade} cards from this note, so the AI was asked for new ones
+              {result.skipped > 0 && `; ${result.skipped} repeat${result.skipped === 1 ? ' was' : 's were'} left out`}.
             </p>
           )}
+          {!result.usedAllText &&
+            (result.coveredAll ? (
+              <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                This round reached the end of your note, so every part has now been used. Next time it starts again from the beginning.
+              </p>
+            ) : (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Your note is long, so these cards come from one part of it. Press “Generate more” later to cover the next parts.
+              </p>
+            ))}
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={onCancel} className={secondaryBtn} disabled={saving}>
@@ -380,7 +396,7 @@ export default function Notes() {
 
       {error && <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
 
-      {view.name === 'generating' && <Generating fileName={view.note.fileName} />}
+      {view.name === 'generating' && <Generating fileName={view.note.fileName} more={view.note.cardCount > 0} />}
 
       {view.name === 'preview' && (
         <Preview
@@ -390,7 +406,12 @@ export default function Notes() {
           decks={view.decks}
           onCancel={backToList}
           onRegenerate={() => handleGenerate(view.note)}
-          onSaved={(data) => setView({ name: 'saved', data })}
+          onSaved={(data) => {
+            // Keep "N cards made" right without reloading the list
+            const id = view.note._id
+            setNotes((list) => list.map((n) => (n._id === id ? { ...n, cardCount: (n.cardCount ?? 0) + data.saved } : n)))
+            setView({ name: 'saved', data })
+          }}
         />
       )}
 
@@ -427,6 +448,11 @@ export default function Notes() {
                     <p className="truncate text-sm font-semibold text-slate-900">{note.fileName}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
                       ~{Math.max(1, Math.round(note.textLength / 6)).toLocaleString('en-IN')} words · {formatDate(note.createdAt)}
+                      {note.cardCount > 0 && (
+                        <span className="ml-1.5 rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                          {note.cardCount} {note.cardCount === 1 ? 'card' : 'cards'} made
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -448,7 +474,7 @@ export default function Notes() {
                       })}
                     </div>
                     <button type="button" onClick={() => handleGenerate(note)} className={primaryBtn}>
-                      <SparkIcon className="h-4 w-4" /> Generate cards
+                      <SparkIcon className="h-4 w-4" /> {note.cardCount > 0 ? 'Generate more' : 'Generate cards'}
                     </button>
                     <button
                       type="button"
