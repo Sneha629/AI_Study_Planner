@@ -21,6 +21,13 @@ export const getQuizHistory = async (deckId) => {
   return response.data
 }
 
+// Submitted quizzes across all decks, newest first (AI Quiz page history)
+export const getRecentQuizzes = async ({ limit = 20, signal } = {}) => {
+  const response = await api.get('/quizzes', { params: { limit }, signal })
+  return response.data
+}
+
+// One submitted quiz with every question, the chosen answer and the right answer
 export const getQuizAttempt = async (quizId) => {
   const response = await api.get(`/quizzes/${quizId}`)
   return response.data

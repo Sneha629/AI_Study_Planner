@@ -547,7 +547,7 @@ Errors:
 - Quiz not found or belongs to another user → `404`
 - Quiz already submitted → `409`
 
-**### GET /api/quizzes/:id**
+### GET /api/quizzes/:id
 
 Returns the details of a submitted quiz attempt, including the user's selected answers and the correct answers.
 
@@ -607,8 +607,38 @@ Rules:
 - Only the authenticated user's quiz attempts are returned.
 - Results are sorted by creation date, newest first.
 - Wrong deck ID or another user's deck → `404`.
+- Quizzes that were started but never submitted are included with `"score": null`.
 
-All three endpoints require a valid bearer token.
+### GET /api/quizzes?limit=20
+
+Returns the user's submitted quizzes across all decks, newest first. Used for the "Recent quizzes" list and the Last / Best score on the AI Quiz page.
+
+Query: `limit` (optional, 1-50, default 20).
+
+Example response (`200`):
+
+```json
+[
+  {
+    "_id": "6730000000000000000000aa",
+    "deckId": "6730000000000000000000bb",
+    "deckName": "CPU Scheduling",
+    "subjectId": "6730000000000000000000cc",
+    "subjectName": "Operating Systems",
+    "score": 4,
+    "total": 5,
+    "percent": 80,
+    "createdAt": "2026-11-14T16:32:10.813Z"
+  }
+]
+```
+
+Rules:
+
+- Only submitted quizzes are returned (unsubmitted ones are skipped).
+- Quizzes from decks that were deleted are left out.
+
+All quiz endpoints require a valid bearer token.
 
 ---
 
