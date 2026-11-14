@@ -12,6 +12,7 @@ const sharedRoutes = require('./routes/shared.routes')
 const requireAuth = require('./middleware/auth')
 const errorHandler = require('./middleware/errorHandler')
 const quizzesRoutes = require('./routes/quizzes.routes')
+const searchRoutes = require('./routes/search.routes')
 
 const app = express()
 
@@ -35,6 +36,7 @@ app.use('/api', requireAuth, notesRoutes)
 app.use('/api', requireAuth, studyRoutes)
 app.use('/api', requireAuth, statsRoutes)
 app.use('/api', requireAuth, quizzesRoutes)
+app.use('/api', requireAuth, searchRoutes)
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' })

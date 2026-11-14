@@ -9,6 +9,37 @@ const Review = require('../models/Review')
 
 const router = Router()
 
+function shareUrlFor(token) {
+  const baseUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/+$/, '')
+  return `${baseUrl}/shared/${token}`
+}
+
+// GET the decks the user is sharing (Shared Decks page), newest first
+router.get('/decks/shared', async (req, res) => {
+  const subjects = await Subject.find({ userId: req.userId }).select('name').lean()
+  const subjectName = new Map(subjects.map((s) => [s._id.toString(), s.name]))
+  const decks = await Deck.find({ subjectId: { $in: subjects.map((s) => s._id) }, shareToken: { $exists: true, $ne: null } })
+    .sort({ createdAt: -1, _id: -1 })
+    .lean()
+  const counts = await Card.aggregate([
+    { $match: { deckId: { $in: decks.map((d) => d._id) } } },
+    { $group: { _id: '$deckId', n: { $sum: 1 } } },
+  ])
+  const countOf = new Map(counts.map((c) => [c._id.toString(), c.n]))
+
+  res.json(
+    decks.map((d) => ({
+      _id: d._id,
+      name: d.name,
+      subjectId: d.subjectId,
+      subjectName: subjectName.get(d.subjectId.toString()),
+      cardCount: countOf.get(d._id.toString()) || 0,
+      shareToken: d.shareToken,
+      shareUrl: shareUrlFor(d.shareToken),
+    })),
+  )
+})
+
 // POST generate or retrieve a deck share link
 router.post('/decks/:id/share', async (req, res) => {
   const { id } = req.params

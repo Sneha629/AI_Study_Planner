@@ -120,8 +120,39 @@ router.get('/stats/overview', async (req, res) => {
     countsBySubject.set(subjectId, current)
   }
 
+  // Dashboard numbers. Review counts per local day are already in reviewCounts.
+  const countSince = (fromDay, toDay = today) =>
+    reviewCounts.reduce((sum, d) => (d._id >= fromDay && d._id <= toDay ? sum + d.count : sum), 0)
+  const allCards = [...countsBySubject.values()]
+
+  // Retention: share of reviews in the last 30 days that were not "Again" (remembered)
+  const [ratingRow] = await Review.aggregate([
+    { $match: { userId: user._id, reviewedAt: { $gte: new Date(Date.now() - 30 * DAY_MS) } } },
+    { $group: { _id: null, total: { $sum: 1 }, again: { $sum: { $cond: [{ $eq: ['$rating', 'again'] }, 1, 0] } } } },
+  ])
+  const retentionReviews = ratingRow?.total || 0
+
   res.json({
     date: today,
+    totals: {
+      reviews: reviewCounts.reduce((sum, d) => sum + d.count, 0),
+      cards: allCards.reduce((sum, c) => sum + c.totalCards, 0),
+      learnedCards: allCards.reduce((sum, c) => sum + c.learnedCards, 0),
+      masteredCards: allCards.reduce((sum, c) => sum + c.masteredCards, 0),
+      dueToday: allCards.reduce((sum, c) => sum + c.dueToday, 0),
+    },
+    activity: {
+      today: countSince(today),
+      thisWeek: countSince(dateDaysAgo(today, 6)),
+      lastWeek: countSince(dateDaysAgo(today, 13), dateDaysAgo(today, 7)),
+      last30Days: countSince(dateDaysAgo(today, 29)),
+      previous30Days: countSince(dateDaysAgo(today, 59), dateDaysAgo(today, 30)),
+    },
+    retention: {
+      // null until there is something to measure
+      rate: retentionReviews ? Math.round(((retentionReviews - ratingRow.again) / retentionReviews) * 1000) / 10 : null,
+      reviews: retentionReviews,
+    },
     streak: {
       current: currentStreak,
       longest: longestStreak,
