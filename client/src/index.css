@@ -1,5 +1,30 @@
 @import "tailwindcss";
 
+/* Design tokens from the Figma design */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #5b4cf0;
+  --color-brand-violet: #7c5cff;
+  --color-mint: #9ff0d8;
+}
+
+/* Auth pages: slow float for the sample cards */
+@keyframes float-y {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translateY(-8px) rotate(var(--tilt, 0deg)); }
+}
+
+.float-card {
+  animation: float-y 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-card {
+    animation: none;
+  }
+}
+
 /* Study mode: 3D card flip */
 .flip-scene {
   perspective: 1400px;
