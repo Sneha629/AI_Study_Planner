@@ -639,3 +639,19 @@ The fields above stay the same. These were added for the dashboard:
 
 - Only the user's own data; up to 5 of each; case-insensitive plain-text match (not a pattern)
 - `q` shorter than 2 characters → empty lists
+
+---
+
+## Subject and deck page additions, protected
+
+- **`description`** (optional, up to 300 characters, default `""`) on subjects and decks: send it in `POST /api/subjects`, `PATCH /api/subjects/:id`, `POST /api/subjects/:id/decks`, `PATCH /api/decks/:id`. `null` clears it. `PATCH /api/decks/:id` now accepts `name`, `description` or both (at least one)
+- **`GET /api/subjects/:id/decks`**: each deck also has `learnedCards`, `masteredCards` (interval 21+ days), `dueToday` and `lastStudiedAt` (time of the newest review, or `null`)
+- **`GET /api/stats/overview`**: each subject also has `description`, `createdAt` and `deckCount`
+
+### GET /api/decks/:id
+
+200 `{ "_id", "name", "description", "subjectId", "subjectName", "shared": true, "cardCount", "learnedCards", "masteredCards", "dueToday", "lastStudiedAt" }` (the share token is not included; `POST /api/decks/:id/share` returns the link). Someone else's deck → 404.
+
+### GET /api/subjects/:id/activity
+
+200 `[{ "date": "2026-11-14", "reviewed": 12, "newCards": 4 }, ...]`: the last 7 days in the user's time zone, oldest first. `newCards` = first reviews of new cards, `reviewed` = repeat reviews.

@@ -54,6 +54,24 @@ export const copySharedDeck = async (token, subjectId) => {
   return response.data
 }
 
+// Create a deck with an optional description (Figma "Create a new deck" popup)
+export const createDeckWithDetails = async (subjectId, { name, description }) => {
+  const response = await api.post(`/subjects/${subjectId}/decks`, { name, description: description ?? '' })
+  return response.data
+}
+
+// Change a deck's name and/or description
+export const updateDeck = async (deckId, changes) => {
+  const response = await api.patch(`/decks/${deckId}`, changes)
+  return response.data
+}
+
+// One deck with subject name, counts, last studied and shared flag
+export const getDeck = async (deckId) => {
+  const response = await api.get(`/decks/${deckId}`)
+  return response.data
+}
+
 // Get exam plan for a subject
 export const getExamPlan = async (subjectId) => {
   const response = await api.get(`/subjects/${subjectId}/plan`)
