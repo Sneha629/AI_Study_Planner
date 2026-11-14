@@ -609,3 +609,33 @@ Rules:
 - Wrong deck ID or another user's deck → `404`.
 
 All three endpoints require a valid bearer token.
+
+---
+
+## Dashboard additions, protected
+
+### GET /api/stats/overview (extra fields)
+
+The fields above stay the same. These were added for the dashboard:
+
+```json
+{
+  "totals": { "reviews": 1284, "cards": 57, "learnedCards": 40, "masteredCards": 14, "dueToday": 12 },
+  "activity": { "today": 16, "thisWeek": 130, "lastWeek": 98, "last30Days": 400, "previous30Days": 350 },
+  "retention": { "rate": 86.1, "reviews": 166 }
+}
+```
+
+- Days are in the user's time zone; `thisWeek` = today and the 6 days before
+- `retention.rate` = % of reviews in the last 30 days not rated "Again" (one decimal), `null` when there are none
+
+### GET /api/decks/shared
+
+200 `[{ "_id", "name", "subjectId", "subjectName", "cardCount", "shareToken", "shareUrl" }]`, the user's shared decks, newest first.
+
+### GET /api/search?q=text
+
+200 `{ "q", "subjects": [{ "_id", "name" }], "decks": [{ "_id", "name", "subjectId", "subjectName" }], "cards": [{ "_id", "front", "back", "deckId", "deckName", "subjectId" }] }`
+
+- Only the user's own data; up to 5 of each; case-insensitive plain-text match (not a pattern)
+- `q` shorter than 2 characters → empty lists
