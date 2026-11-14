@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import AuthLayout from '../components/AuthLayout.jsx'
+import { GoogleButton, OrDivider } from '../components/AuthExtras.jsx'
 import FormField from '../components/FormField.jsx'
 import PasswordStrength from '../components/PasswordStrength.jsx'
 import SubmitButton from '../components/SubmitButton.jsx'
@@ -12,6 +13,7 @@ export default function Signup() {
   const navigate = useNavigate()
   const location = useLocation()
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
+  const [agreed, setAgreed] = useState(false)
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -27,6 +29,7 @@ export default function Signup() {
     if (!form.password) e.password = 'Password is required'
     else if (form.password.length < 8) e.password = 'Password must be at least 8 characters'
     if (form.confirm !== form.password) e.confirm = 'Passwords do not match'
+    if (!agreed) e.agreed = 'Please agree to the Terms and Privacy Policy'
     return e
   }
 
@@ -60,20 +63,23 @@ export default function Signup() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="Start turning your notes into flashcards."
+      eyebrow="Create your workspace"
+      title="Start learning smarter."
+      subtitle="Build better study habits with a plan made for you."
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
-            Log in
+          <Link to="/login" className="font-semibold text-brand-500 hover:text-brand-600 hover:underline">
+            Sign in
           </Link>
         </>
       }
     >
+      <GoogleButton />
+      <OrDivider />
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <FormField
-          label="Name"
+          label="Full name"
           name="name"
           icon="user"
           autoComplete="name"
@@ -85,12 +91,12 @@ export default function Signup() {
           error={errors.name}
         />
         <FormField
-          label="Email"
+          label="Email address"
           name="email"
           type="email"
           icon="mail"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder="you@university.edu"
           value={form.email}
           onChange={handleChange}
           error={errors.email}
@@ -124,8 +130,27 @@ export default function Signup() {
           }
           success={passwordsMatch ? 'Passwords match' : undefined}
         />
-        <SubmitButton loading={submitting} loadingText="Creating account...">
-          Sign up
+        <div>
+          {/* Terms and Privacy pages are not built yet, so the names are plain text for now */}
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600 select-none">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => {
+                setAgreed(e.target.checked)
+                if (e.target.checked) setErrors((prev) => ({ ...prev, agreed: undefined }))
+              }}
+              className="h-4 w-4 rounded accent-brand-500"
+            />
+            <span>
+              I agree to the <span className="font-medium text-brand-500">Terms</span> and{' '}
+              <span className="font-medium text-brand-500">Privacy Policy</span>
+            </span>
+          </label>
+          {errors.agreed && <p className="mt-1.5 text-sm text-red-600">{errors.agreed}</p>}
+        </div>
+        <SubmitButton loading={submitting} loadingText="Creating account..." arrow>
+          Create free account
         </SubmitButton>
       </form>
     </AuthLayout>

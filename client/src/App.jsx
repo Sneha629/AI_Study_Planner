@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
 
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
@@ -17,12 +17,18 @@ import Quiz from './pages/Quiz.jsx'
 import Navbar from './components/Navbar.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 
+// Full-screen pages that bring their own layout (no navbar, no page padding)
+const FULL_SCREEN = ['/login', '/signup']
+
 export default function App() {
+  const { pathname } = useLocation()
+  const fullScreen = FULL_SCREEN.includes(pathname)
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar />
+      {!fullScreen && <Navbar />}
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <main className={fullScreen ? '' : 'mx-auto max-w-6xl px-4 py-8 sm:px-6'}>
         <Routes>
           <Route
             path="/"

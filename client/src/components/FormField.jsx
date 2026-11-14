@@ -52,16 +52,16 @@ export default function FormField({ label, error, hint, success, icon, children,
     ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
     : success
       ? 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100'
-      : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-100'
+      : 'border-slate-200 focus:border-brand-500 focus:ring-indigo-100'
 
   return (
     <div>
-      <label htmlFor={inputProps.name} className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label htmlFor={inputProps.name} className="mb-1.5 block text-[13px] font-medium text-slate-700">
         {label}
       </label>
       <div className="group relative">
         {icon && (
-          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 transition group-focus-within:text-indigo-500">
+          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 transition group-focus-within:text-brand-500">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
               {ICONS[icon]}
             </svg>
@@ -81,7 +81,7 @@ export default function FormField({ label, error, hint, success, icon, children,
             setCapsLock(false)
             inputProps.onBlur?.(e)
           }}
-          className={`w-full rounded-xl border bg-white/70 py-2.5 text-slate-900 placeholder-slate-400 outline-none transition focus:bg-white focus:ring-4 ${
+          className={`h-11 w-full rounded-xl border bg-white text-sm text-slate-900 shadow-sm shadow-slate-900/[0.02] placeholder-slate-400 outline-none transition focus:ring-4 ${
             icon ? 'pl-10' : 'pl-3.5'
           } ${isPassword || success ? 'pr-11' : 'pr-3.5'} ${border}`}
         />

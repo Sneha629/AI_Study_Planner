@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import AuthLayout from '../components/AuthLayout.jsx'
+import { ForgotPasswordLink, GoogleButton, OrDivider } from '../components/AuthExtras.jsx'
 import FormField from '../components/FormField.jsx'
 import SubmitButton from '../components/SubmitButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -77,26 +78,29 @@ export default function Login() {
 
   return (
     <AuthLayout
-      title="Welcome back 👋"
-      subtitle="Log in to continue your revision."
+      eyebrow="Welcome back"
+      title="Good to see you again."
+      subtitle="Sign in to continue your learning momentum."
       footer={
         <>
-          New here?{' '}
-          <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
-            Sign up
+          New to StudyPlanner?{' '}
+          <Link to="/signup" className="font-semibold text-brand-500 hover:text-brand-600 hover:underline">
+            Create an account
           </Link>
         </>
       }
     >
+      <GoogleButton />
+      <OrDivider />
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <FormField
-          label="Email"
+          label="Email address"
           name="email"
           type="email"
           icon="mail"
           autoComplete="email"
           autoFocus={!form.email}
-          placeholder="you@example.com"
+          placeholder="you@university.edu"
           value={form.email}
           onChange={handleChange}
           error={errors.email}
@@ -113,17 +117,21 @@ export default function Login() {
           onChange={handleChange}
           error={errors.password}
         />
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 select-none">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-            className="h-4 w-4 rounded accent-indigo-600"
-          />
-          Remember my email on this device
-        </label>
-        <SubmitButton loading={submitting} loadingText="Logging in...">
-          Log in
+        <div className="flex items-center justify-between">
+          {/* Remembers only the email on this device, never the password */}
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600 select-none">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-4 w-4 rounded accent-brand-500"
+            />
+            Remember me
+          </label>
+          <ForgotPasswordLink />
+        </div>
+        <SubmitButton loading={submitting} loadingText="Signing in..." arrow>
+          Sign in to StudyPlanner
         </SubmitButton>
       </form>
     </AuthLayout>
