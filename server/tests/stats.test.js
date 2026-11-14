@@ -70,7 +70,9 @@ describe('GET /api/stats/overview', () => {
       { date: yesterday, count: 1 },
       { date: today, count: 1 },
     ])
-    expect(res.body.subjects).toEqual([{
+    // toMatchObject: newer fields (description, deckCount, ...) may be added without breaking this
+    expect(res.body.subjects).toHaveLength(1)
+    expect(res.body.subjects[0]).toMatchObject({
       _id: subject._id.toString(),
       name: 'Physics',
       examDate: '2099-12-10',
@@ -79,7 +81,7 @@ describe('GET /api/stats/overview', () => {
       learnedCards: 3,
       masteredCards: 1,
       dueToday: 4,
-    }])
+    })
   })
 
   it('breaks a streak at a missing study day', async () => {

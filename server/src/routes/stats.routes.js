@@ -43,7 +43,7 @@ router.get('/stats/overview', async (req, res) => {
   const heatmapStart = dateDaysAgo(today, HEATMAP_DAYS - 1)
 
   const [subjects, reviewCounts] = await Promise.all([
-    Subject.find({ userId: req.userId }).select('name examDate').lean(),
+    Subject.find({ userId: req.userId }).select('name examDate description createdAt').lean(),
     Review.aggregate([
       { $match: { userId: user._id } },
       {
@@ -159,10 +159,13 @@ router.get('/stats/overview', async (req, res) => {
       studiedToday,
     },
     heatmap,
-    subjects: subjects.map(({ _id, name, examDate }) => ({
+    subjects: subjects.map(({ _id, name, examDate, description, createdAt }) => ({
       _id: _id.toString(),
       name,
       examDate,
+      description: description || '',
+      createdAt,
+      deckCount: decks.filter((d) => d.subjectId.toString() === _id.toString()).length,
       daysLeft: daysUntil(examDate, today),
       totalCards: countsBySubject.get(_id.toString())?.totalCards || 0,
       learnedCards: countsBySubject.get(_id.toString())?.learnedCards || 0,
