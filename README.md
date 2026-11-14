@@ -166,5 +166,5 @@ Every route, its body, response and errors are listed in [docs/API.md](docs/API.
 
 ## What's next
 
-- "Generate more" AI cards from the same note without repeating earlier cards
-- Faster generation for 20 and 30 cards
+- Pick which part of a long note to make cards from
+- Show the existing cards next to the AI preview

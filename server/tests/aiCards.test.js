@@ -7,7 +7,7 @@ jest.mock('../src/services/llm', () => {
 const request = require('supertest')
 const app = require('../src/app')
 const { chatJson, LlmError } = require('../src/services/llm')
-const { chunkText, pickChunks, share } = require('../src/services/cardGenerator')
+const { chunkText, pickChunks, share, planRequests, keyWords, isSimilar } = require('../src/services/cardGenerator')
 
 const Subject = require('../src/models/Subject')
 const Deck = require('../src/models/Deck')
@@ -45,16 +45,38 @@ beforeEach(async () => {
 })
 
 describe('cardGenerator helpers', () => {
-  it('splits long text at paragraphs and spreads picks across the note', () => {
+  it('splits long text at paragraphs and walks through the note across generations', () => {
     const text = Array.from({ length: 10 }, (_, i) => `Para ${i} `.repeat(200)).join('\n\n')
     const chunks = chunkText(text, 3000)
     expect(chunks.length).toBeGreaterThan(4)
     expect(chunks.every((c) => c.length <= 3000)).toBe(true)
 
-    const picked = pickChunks(chunks)
-    expect(picked).toHaveLength(4)
-    expect(picked[0]).toBe(chunks[0])
-    expect(picked[3]).toBe(chunks[chunks.length - 1])
+    const first = pickChunks(chunks, 0)
+    expect(first.picked).toEqual(chunks.slice(0, 4))
+    expect(first.next).toBe(4)
+    expect(first.reachedEnd).toBe(false)
+
+    // The next generation continues after those parts and wraps around at the end
+    const second = pickChunks(chunks, first.next)
+    expect(second.picked[0]).toBe(chunks[4])
+    const last = pickChunks(chunks, chunks.length - 2)
+    expect(last.picked.slice(0, 2)).toEqual(chunks.slice(-2))
+    expect(last.picked[2]).toBe(chunks[0])
+    expect(last.reachedEnd).toBe(true)
+  })
+
+  it('splits big counts into parallel batches of at most 10', () => {
+    expect(planRequests(['only part'], 20).map((r) => r.count)).toEqual([10, 10])
+    expect(planRequests(['only part'], 30).map((r) => r.count)).toEqual([10, 10, 10])
+    // Batches on the same part get different focuses so they don't overlap
+    const focuses = planRequests(['only part'], 20).map((r) => r.focus)
+    expect(new Set(focuses).size).toBe(2)
+    expect(planRequests(['a', 'b'], 10).map((r) => r.count)).toEqual([5, 5])
+  })
+
+  it('treats reworded questions as the same card', () => {
+    expect(isSimilar(keyWords('What is inertia?'), keyWords('Inertia is what?'))).toBe(true)
+    expect(isSimilar(keyWords('What is inertia?'), keyWords('What is momentum?'))).toBe(false)
   })
 
   it('shares the card count fairly', () => {
@@ -75,7 +97,9 @@ describe('POST /api/notes/:id/generate', () => {
     expect(res.body.suggestedDeckName).toBe('Chapter 3 motion')
     expect(res.body.usedAllText).toBe(true)
     expect(await Card.countDocuments()).toBe(0)
-    expect(chatJson.mock.calls[0][0].user).toContain('Make 10 flashcards')
+    // A couple extra are asked for, so enough remain after dropping repeats
+    expect(chatJson.mock.calls[0][0].user).toContain('Make 12 flashcards')
+    expect(res.body).toMatchObject({ alreadyMade: 0, skipped: 0, lastDeckId: null, coveredAll: true })
   })
 
   it('drops empty and duplicate cards and never returns more than asked', async () => {
@@ -123,6 +147,84 @@ describe('POST /api/notes/:id/generate', () => {
     const res = await request(app).post(`/api/notes/${other.noteId}/generate`).set(auth(me.token)).send({ count: 10 })
     expect(res.status).toBe(404)
     expect(chatJson).not.toHaveBeenCalled()
+  })
+})
+
+describe('Generate more from the same note', () => {
+  async function saveExisting(fronts) {
+    const deck = await Deck.create({ subjectId: me.subjectId, name: 'Chapter 3 motion' })
+    await Card.insertMany(
+      fronts.map((front) => ({ deckId: deck._id, front, back: 'old', source: 'ai', noteId: me.noteId, dueDate: '2026-11-01' })),
+    )
+    return deck
+  }
+
+  const generate = (user, count = 10) =>
+    request(app).post(`/api/notes/${user.noteId}/generate`).set(auth(user.token)).send({ count })
+
+  it('tells the AI about existing cards and drops repeats, even reworded ones', async () => {
+    const deck = await saveExisting(['What is inertia?', 'State Newton first law'])
+    chatJson.mockResolvedValue({
+      cards: [
+        { front: 'What is inertia?', back: 'dup' },
+        { front: 'Inertia is what?', back: 'reworded dup' },
+        { front: 'What is momentum?', back: 'p = mv' },
+        { front: 'What is friction?', back: 'Force opposing motion' },
+      ],
+    })
+
+    const res = await generate(me)
+
+    expect(res.status).toBe(200)
+    expect(res.body.cards.map((c) => c.front)).toEqual(['What is momentum?', 'What is friction?'])
+    expect(res.body).toMatchObject({ alreadyMade: 2, skipped: 2, lastDeckId: deck._id.toString() })
+    const prompt = chatJson.mock.calls[0][0].user
+    expect(prompt).toContain('already has')
+    expect(prompt).toContain('- State Newton first law')
+  })
+
+  it('says the note is covered when the AI only repeats existing cards', async () => {
+    await saveExisting(['What is inertia?'])
+    chatJson.mockResolvedValue({ cards: [{ front: 'What is inertia?', back: 'again' }] })
+
+    const res = await generate(me)
+
+    expect(res.status).toBe(422)
+    expect(res.body.error).toMatch(/fully covered/)
+  })
+
+  it('moves on to the next parts of a long note each time', async () => {
+    // Six parts of ~12,000 characters each, so the note splits into six chunks
+    const parts = ['PartA', 'PartB', 'PartC', 'PartD', 'PartE', 'PartF'].map((p) => `${p} `.repeat(2000))
+    const long = await makeUserWithNote('long@example.com', parts.join('\n\n'))
+    chatJson.mockResolvedValue(aiCards(3))
+
+    const first = await generate(long)
+    expect(first.body.coveredAll).toBe(false)
+    expect((await Note.findById(long.noteId)).nextChunk).toBe(4)
+    expect(chatJson.mock.calls.some((c) => c[0].user.includes('PartE'))).toBe(false)
+
+    chatJson.mockClear()
+    chatJson.mockResolvedValue(aiCards(3, 'Next'))
+    const second = await generate(long)
+    expect(chatJson.mock.calls.some((c) => c[0].user.includes('PartE'))).toBe(true)
+    expect(second.body.coveredAll).toBe(true)
+  })
+
+  it('makes 20 cards from a short note with two parallel requests', async () => {
+    chatJson.mockResolvedValueOnce(aiCards(12, 'A')).mockResolvedValueOnce(aiCards(12, 'B'))
+
+    const res = await generate(me, 20)
+
+    expect(chatJson).toHaveBeenCalledTimes(2)
+    expect(res.body.cards).toHaveLength(20)
+  })
+
+  it('shows how many cards each note already has', async () => {
+    await saveExisting(['One?', 'Two?', 'Three?'])
+    const res = await request(app).get(`/api/subjects/${me.subjectId}/notes`).set(auth(me.token))
+    expect(res.body[0]).toMatchObject({ cardCount: 3 })
+    expect(res.body[0].nextChunk).toBeUndefined()
   })
 })
 
