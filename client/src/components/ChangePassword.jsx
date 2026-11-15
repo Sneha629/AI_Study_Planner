@@ -4,6 +4,7 @@ import api from '../api/client.js'
 import FormField from './FormField.jsx'
 import PasswordStrength from './PasswordStrength.jsx'
 import SubmitButton from './SubmitButton.jsx'
+import { cardClass } from './PageHeader.jsx'
 
 const EMPTY = { currentPassword: '', newPassword: '', confirm: '' }
 
@@ -49,8 +50,9 @@ export default function ChangePassword() {
   const matches = form.confirm.length > 0 && form.confirm === form.newPassword
 
   return (
-    <div className="mt-6 rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200 sm:p-10">
-      <h2 className="text-xl font-bold text-slate-900">Change password</h2>
+    <section className={`${cardClass} p-6 sm:p-7`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Security</p>
+      <h2 className="mt-1 text-xl font-medium tracking-tight text-slate-900">Change password</h2>
       <p className="mt-1 text-sm text-slate-500">You will need your current password.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
@@ -92,6 +94,6 @@ export default function ChangePassword() {
           Change password
         </SubmitButton>
       </form>
-    </div>
+    </section>
   )
 }

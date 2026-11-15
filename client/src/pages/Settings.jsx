@@ -5,6 +5,9 @@ import FormField from '../components/FormField.jsx'
 import ChangePassword from '../components/ChangePassword.jsx'
 import SubmitButton from '../components/SubmitButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import PageHeader, { cardClass } from '../components/PageHeader.jsx'
+import { Avatar } from '../components/AppShell.jsx'
+import { fieldInput, fieldLabel } from '../components/Modal.jsx'
 
 export default function Settings() {
   const { user, updateUser } = useAuth()
@@ -85,16 +88,24 @@ export default function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-xl">
-      <div className="rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200 sm:p-10">
-        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="mt-1 text-sm text-slate-500">Change your profile and daily study limits.</p>
+    <div>
+      <PageHeader eyebrow="Account" title="Settings" subtitle="Your profile, daily study limits and password." />
+      <div className="grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
+      <section className={`${cardClass} p-6 sm:p-7`}>
+        <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
+          <Avatar name={user?.name} className="h-14 w-14 text-base" />
+          <div className="min-w-0">
+            <p className="truncate text-lg font-medium tracking-tight text-slate-900">{user?.name}</p>
+            <p className="truncate text-sm text-slate-500">{user?.email}</p>
+          </div>
+        </div>
+        <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Profile & study limits</p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-5" noValidate>
           <FormField label="Name" name="name" icon="user" value={form.name} onChange={handleChange} error={errors.name} />
 
           <div>
-            <label htmlFor="timezone" className="mb-1.5 block text-sm font-medium text-slate-700">
+            <label htmlFor="timezone" className={fieldLabel}>
               Time zone
             </label>
             <select
@@ -102,7 +113,7 @@ export default function Settings() {
               name="timezone"
               value={form.timezone}
               onChange={handleChange}
-              className="w-full rounded-xl border border-slate-300 bg-white/70 px-3.5 py-2.5 text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+              className={fieldInput}
             >
               {timeZones.map((tz) => (
                 <option key={tz} value={tz}>
@@ -142,9 +153,10 @@ export default function Settings() {
             Save settings
           </SubmitButton>
         </form>
-      </div>
+      </section>
 
       <ChangePassword />
+      </div>
     </div>
   )
 }
