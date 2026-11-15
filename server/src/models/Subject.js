@@ -8,6 +8,8 @@ const subjectSchema = new Schema(
     name: { type: String, required: true, trim: true },
     // "YYYY-MM-DD" in the student's time zone; null when no exam is set (F3)
     examDate: { type: String, default: null },
+    // Optional one-line summary shown on the subject card
+    description: { type: String, default: '', trim: true, maxlength: 300 },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 )

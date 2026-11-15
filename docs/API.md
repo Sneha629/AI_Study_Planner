@@ -547,7 +547,7 @@ Errors:
 - Quiz not found or belongs to another user → `404`
 - Quiz already submitted → `409`
 
-**### GET /api/quizzes/:id**
+### GET /api/quizzes/:id
 
 Returns the details of a submitted quiz attempt, including the user's selected answers and the correct answers.
 
@@ -607,5 +607,81 @@ Rules:
 - Only the authenticated user's quiz attempts are returned.
 - Results are sorted by creation date, newest first.
 - Wrong deck ID or another user's deck → `404`.
+- Quizzes that were started but never submitted are included with `"score": null`.
 
-All three endpoints require a valid bearer token.
+### GET /api/quizzes?limit=20
+
+Returns the user's submitted quizzes across all decks, newest first. Used for the "Recent quizzes" list and the Last / Best score on the AI Quiz page.
+
+Query: `limit` (optional, 1-50, default 20).
+
+Example response (`200`):
+
+```json
+[
+  {
+    "_id": "6730000000000000000000aa",
+    "deckId": "6730000000000000000000bb",
+    "deckName": "CPU Scheduling",
+    "subjectId": "6730000000000000000000cc",
+    "subjectName": "Operating Systems",
+    "score": 4,
+    "total": 5,
+    "percent": 80,
+    "createdAt": "2026-11-14T16:32:10.813Z"
+  }
+]
+```
+
+Rules:
+
+- Only submitted quizzes are returned (unsubmitted ones are skipped).
+- Quizzes from decks that were deleted are left out.
+
+All quiz endpoints require a valid bearer token.
+
+---
+
+## Dashboard additions, protected
+
+### GET /api/stats/overview (extra fields)
+
+The fields above stay the same. These were added for the dashboard:
+
+```json
+{
+  "totals": { "reviews": 1284, "cards": 57, "learnedCards": 40, "masteredCards": 14, "dueToday": 12 },
+  "activity": { "today": 16, "thisWeek": 130, "lastWeek": 98, "last30Days": 400, "previous30Days": 350 },
+  "retention": { "rate": 86.1, "reviews": 166 }
+}
+```
+
+- Days are in the user's time zone; `thisWeek` = today and the 6 days before
+- `retention.rate` = % of reviews in the last 30 days not rated "Again" (one decimal), `null` when there are none
+
+### GET /api/decks/shared
+
+200 `[{ "_id", "name", "subjectId", "subjectName", "cardCount", "shareToken", "shareUrl" }]`, the user's shared decks, newest first.
+
+### GET /api/search?q=text
+
+200 `{ "q", "subjects": [{ "_id", "name" }], "decks": [{ "_id", "name", "subjectId", "subjectName" }], "cards": [{ "_id", "front", "back", "deckId", "deckName", "subjectId" }] }`
+
+- Only the user's own data; up to 5 of each; case-insensitive plain-text match (not a pattern)
+- `q` shorter than 2 characters → empty lists
+
+---
+
+## Subject and deck page additions, protected
+
+- **`description`** (optional, up to 300 characters, default `""`) on subjects and decks: send it in `POST /api/subjects`, `PATCH /api/subjects/:id`, `POST /api/subjects/:id/decks`, `PATCH /api/decks/:id`. `null` clears it. `PATCH /api/decks/:id` now accepts `name`, `description` or both (at least one)
+- **`GET /api/subjects/:id/decks`**: each deck also has `learnedCards`, `masteredCards` (interval 21+ days), `dueToday` and `lastStudiedAt` (time of the newest review, or `null`)
+- **`GET /api/stats/overview`**: each subject also has `description`, `createdAt` and `deckCount`
+
+### GET /api/decks/:id
+
+200 `{ "_id", "name", "description", "subjectId", "subjectName", "shared": true, "cardCount", "learnedCards", "masteredCards", "dueToday", "lastStudiedAt" }` (the share token is not included; `POST /api/decks/:id/share` returns the link). Someone else's deck → 404.
+
+### GET /api/subjects/:id/activity
+
+200 `[{ "date": "2026-11-14", "reviewed": 12, "newCards": 4 }, ...]`: the last 7 days in the user's time zone, oldest first. `newCards` = first reviews of new cards, `reviewed` = repeat reviews.

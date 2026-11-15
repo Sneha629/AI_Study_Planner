@@ -4,6 +4,8 @@ const deckSchema = new Schema(
   {
     subjectId: { type: Schema.Types.ObjectId, ref: 'Subject', required: true, index: true },
     name: { type: String, required: true, trim: true },
+    // Optional one-line summary shown on the deck card
+    description: { type: String, default: '', trim: true, maxlength: 300 },
     // Set when the owner shares the deck (F13); sparse so many decks can have none
     shareToken: { type: String, unique: true, sparse: true },
     copiedFromDeckId: { type: Schema.Types.ObjectId, ref: 'Deck', default: null },
