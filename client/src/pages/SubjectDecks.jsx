@@ -1,719 +1,358 @@
-
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import {
-  getDecks,
-  createDeck,
-  renameDeck,
-  deleteDeck,
-  shareDeck,
-  unshareDeck,
-  getExamPlan,
-} from '../api/decks.js'
+import { getOverview } from '../api/dashboard.js'
+import { createDeckWithDetails, deleteDeck, getDecks, getExamPlan, updateDeck } from '../api/decks.js'
+import { getSubjectActivity } from '../api/subjects.js'
+import { cardClass, primaryBtn, secondaryBtn } from '../components/PageHeader.jsx'
+import Modal, { fieldInput, fieldLabel, fieldTextarea } from '../components/Modal.jsx'
+import { EditIcon, IconButton, TrashIcon } from '../components/IconButtons.jsx'
+import { CheckIcon, PlayIcon, SparkIcon } from '../components/Icons.jsx'
 
-function BookIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-6 w-6">
-      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
-      <path d="M4 5.5v16M8 7h8M8 11h7" />
-    </svg>
-  )
+const LayersIcon = ({ className = 'h-5 w-5' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" className={className} aria-hidden="true">
+    <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+    <path d="m3 13 9 5 9-5" />
+  </svg>
+)
+
+const STATUS = {
+  'on-track': { label: 'On track', className: 'bg-emerald-50 text-emerald-700' },
+  behind: { label: 'Behind', className: 'bg-amber-50 text-amber-700' },
 }
 
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  )
+function longDate(ymd) {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-      <circle cx="10.8" cy="10.8" r="6.8" />
-      <path d="m16 16 4.5 4.5" />
-    </svg>
-  )
+function dayName(ymd) {
+  return new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'UTC' })
 }
 
-function EditIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
-      <path d="m14 5 5 5M4 20l4.5-1 11-11a2.12 2.12 0 0 0-3-3l-11 11z" />
-    </svg>
-  )
+// "Studied today at 9:24 am" / "Studied yesterday" / "Studied 4 days ago"
+function lastStudied(iso) {
+  if (!iso) return 'Not studied yet'
+  const at = new Date(iso)
+  const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const days = Math.round((start(new Date()) - start(at)) / 86400000)
+  if (days <= 0) return `Studied today at ${at.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`
+  if (days === 1) return 'Studied yesterday'
+  return `Studied ${days} days ago`
 }
 
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
-      <path d="M4 7h16M10 11v6M14 11v6M5 7l1 14h12l1-14M9 7V4h6v3" />
-    </svg>
-  )
+function errorText(err, fallback) {
+  return err.response?.data?.details?.[0]?.message || err.response?.data?.error || fallback
 }
 
-const cardColors = [
-  'from-violet-500 to-indigo-600',
-  'from-cyan-500 to-blue-600',
-  'from-emerald-500 to-teal-600',
-  'from-orange-400 to-pink-500',
-  'from-fuchsia-500 to-purple-600',
-  'from-sky-500 to-indigo-500',
-]
-
-export default function SubjectDecks() {
-  const { id } = useParams()
-
-  const [decks, setDecks] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [deckName, setDeckName] = useState('')
-  const [search, setSearch] = useState('')
+// Figma "Create a new deck" popup, also used to edit a deck
+function DeckModal({ subjectId, deck, onClose, onSaved }) {
+  const editing = Boolean(deck?._id)
+  const [name, setName] = useState(deck?.name ?? '')
+  const [description, setDescription] = useState(deck?.description ?? '')
   const [saving, setSaving] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [editingName, setEditingName] = useState('')
-  const [renaming, setRenaming] = useState(false)
-  const [deletingId, setDeletingId] = useState(null)
-  const [sharingId, setSharingId] = useState(null)
 
-  const [examPlan, setExamPlan] = useState(null)
-  const [planLoading, setPlanLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-
-    getDecks(id)
-      .then((data) => {
-        if (!cancelled) {
-          setDecks(Array.isArray(data) ? data : [])
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          toast.error(error.response?.data?.error || 'Could not load decks')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [id])
-
-  useEffect(() => {
-    let cancelled = false
-    setPlanLoading(true)
-    setExamPlan(null)
-
-    getExamPlan(id)
-      .then((data) => {
-        if (!cancelled) setExamPlan(data)
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          toast.error(error.response?.data?.error || 'Could not load exam plan')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setPlanLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [id])
-
-  const totalCards = useMemo(
-    () => decks.reduce((total, deck) => total + (deck.cardCount || 0), 0),
-    [decks],
-  )
-
-  const filteredDecks = useMemo(
-    () =>
-      decks.filter((deck) =>
-        deck.name.toLowerCase().includes(search.trim().toLowerCase()),
-      ),
-    [decks, search],
-  )
-
-  const handleCreate = async (event) => {
-    event.preventDefault()
-
-    const name = deckName.trim()
-
-    if (!name) {
-      toast.error('Please enter a deck name')
-      return
-    }
-
-    if (name.length > 100) {
-      toast.error('Deck name cannot exceed 100 characters')
-      return
-    }
-
+  async function save(e) {
+    e.preventDefault()
+    if (!name.trim()) return toast.error('Give the deck a name.')
+    setSaving(true)
     try {
-      setSaving(true)
-      const data = await createDeck(id, name)
-
-      setDecks((previous) => [...previous, data])
-      setDeckName('')
-      toast.success('Your new deck is ready!')
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Could not create deck')
+      const saved = editing
+        ? await updateDeck(deck._id, { name: name.trim(), description })
+        : await createDeckWithDetails(subjectId, { name: name.trim(), description })
+      toast.success(editing ? 'Deck updated' : 'Deck created')
+      onSaved(saved)
+    } catch (err) {
+      toast.error(errorText(err, 'Could not save the deck.'))
     } finally {
       setSaving(false)
     }
   }
 
-  const startRename = (deck) => {
-    setEditingId(deck._id)
-    setEditingName(deck.name)
-  }
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      icon={<LayersIcon />}
+      title={editing ? 'Edit deck' : 'Create a new deck'}
+      subtitle="Group related concepts into a focused flashcard collection."
+    >
+      <form onSubmit={save} className="space-y-4" noValidate>
+        <div>
+          <label htmlFor="d-name" className={fieldLabel}>Deck name</label>
+          <input id="d-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. Work and Energy" className={fieldInput} />
+        </div>
+        <div>
+          <label htmlFor="d-desc" className={fieldLabel}>Description</label>
+          <textarea id="d-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} placeholder="What will this deck cover?" className={fieldTextarea} />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className={secondaryBtn}>Cancel</button>
+          <button type="submit" disabled={saving} className={primaryBtn}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Add deck'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
 
-  const cancelRename = () => {
-    setEditingId(null)
-    setEditingName('')
-  }
+function ExamCard({ subject, plan }) {
+  const learnedPct = subject.totalCards ? Math.round((subject.learnedCards / subject.totalCards) * 100) : 0
 
-  const handleRename = async (deckId) => {
-    const name = editingName.trim()
-
-    if (!name) {
-      toast.error('Deck name cannot be empty')
-      return
-    }
-
-    if (name.length > 100) {
-      toast.error('Deck name cannot exceed 100 characters')
-      return
-    }
-
-    try {
-      setRenaming(true)
-      const data = await renameDeck(deckId, name)
-
-      setDecks((previous) =>
-        previous.map((deck) =>
-          deck._id === deckId
-            ? { ...data, cardCount: deck.cardCount }
-            : deck,
-        ),
-      )
-
-      cancelRename()
-      toast.success('Deck renamed successfully')
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Could not rename deck')
-    } finally {
-      setRenaming(false)
-    }
-  }
-
-  const handleDelete = async (deckId) => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete this deck? Its cards and review history will also be deleted.',
+  if (!subject.examDate) {
+    return (
+      <section className={`${cardClass} flex flex-col justify-center p-6 text-center`}>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Exam preparation</p>
+        <p className="mt-2 text-sm text-slate-500">No exam date yet. Add one to get a day-by-day plan.</p>
+        <Link to="/subjects" className="mt-3 text-xs font-semibold text-brand-500 hover:underline">Set an exam date →</Link>
+      </section>
     )
-
-    if (!confirmed) return
-
-    try {
-      setDeletingId(deckId)
-      await deleteDeck(deckId)
-
-      setDecks((previous) =>
-        previous.filter((deck) => deck._id !== deckId),
-      )
-
-      toast.success('Deck deleted successfully')
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Could not delete deck')
-    } finally {
-      setDeletingId(null)
-    }
   }
 
-  const handleShare = async (deckId) => {
-    try {
-      setSharingId(deckId)
-
-      const data = await shareDeck(deckId)
-      const shareUrl = data.shareUrl || `${window.location.origin}/shared/${data.shareToken}`
-
-      await navigator.clipboard.writeText(shareUrl)
-      toast.success('Share link copied!')
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Could not create share link')
-    } finally {
-      setSharingId(null)
-    }
-  }
-
-  const formatScheduleDate = (dateString) => {
-    const date = new Date(`${dateString}T00:00:00`)
-    return date.toLocaleDateString('en-IN', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    })
-  }
-
-  const getExamStatus = () => {
-    if (examPlan?.status === 'behind') return 'Behind schedule'
-    if (examPlan?.status === 'on-track') return 'On track'
-    return 'No exam date set'
-  }
+  const status = STATUS[plan?.status]
+  const steps = [
+    { done: plan?.newPerDay === 0, text: plan?.newPerDay ? `Learn ${plan.newPerDay} new ${plan.newPerDay === 1 ? 'card' : 'cards'} a day` : 'All new cards learned', sub: `${plan?.newCardsLeft ?? 0} new cards left` },
+    { done: subject.dueToday === 0, text: subject.dueToday ? `Review ${subject.dueToday} cards due today` : 'Reviews done for today', sub: 'Keeps what you learned fresh' },
+  ]
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 pb-10">
-      {/* Hero section */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-900 px-6 py-9 text-white shadow-xl shadow-indigo-950/10 sm:px-10 sm:py-12">
-        <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
-
-        <div className="relative z-10 max-w-2xl">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-indigo-100">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            YOUR PERSONAL LEARNING SPACE
-          </div>
-
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Your Study Decks<span className="text-violet-300">.</span>
-          </h1>
-
-          <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100/80 sm:text-base">
-            Turn your study material into organized knowledge. Create decks,
-            manage your cards, and make every study session count.
-          </p>
-
-          <div className="mt-7 flex flex-wrap items-center gap-3 text-sm text-indigo-100/80">
-            <span className="rounded-lg border border-white/15 bg-white/10 px-3 py-2">
-              {decks.length} study decks
-            </span>
-            <span className="rounded-lg border border-white/15 bg-white/10 px-3 py-2">
-              {totalCards} learning cards
-            </span>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              to={`/subjects/${id}/notes`}
-              className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-indigo-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-indigo-50"
-            >
-              ✨ Make cards from notes
-            </Link>
-            <Link
-              to={`/study?subjectId=${id}`}
-              className="rounded-xl border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
-            >
-              Study this subject →
-            </Link>
-          </div>
+    <section className={`${cardClass} p-6`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Exam preparation</p>
+          <h2 className="mt-1 text-xl font-medium tracking-tight text-slate-900">{subject.name} exam</h2>
         </div>
+        {status && <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.className}`}>{status.label}</span>}
+      </div>
 
-        <div className="pointer-events-none absolute bottom-7 right-10 hidden opacity-20 lg:block">
-          <BookIcon />
-          <div className="mt-2 text-7xl font-bold">A+</div>
+      <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 rounded-xl border border-slate-200 bg-slate-50/60">
+        <div className="px-3 py-2.5">
+          <p className="text-[10px] text-slate-500">Exam date</p>
+          <p className="text-[13px] font-medium text-slate-800">{longDate(subject.examDate)}</p>
         </div>
-      </section>
+        <div className="px-3 py-2.5">
+          <p className="text-[10px] text-slate-500">Remaining</p>
+          <p className="text-[13px] font-medium text-slate-800">{subject.daysLeft === 0 ? 'Exam today' : `${Math.max(0, subject.daysLeft)} days`}</p>
+        </div>
+      </div>
 
-      {/* Statistics */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-500">Total Decks</p>
-            <span className="rounded-xl bg-violet-50 p-2.5 text-violet-600">
-              <BookIcon />
+      <div className="mt-5 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Study plan progress</span>
+        <span>{subject.learnedCards} of {subject.totalCards} cards learned</span>
+      </div>
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full bg-linear-to-r from-brand-500 to-brand-violet" style={{ width: `${learnedPct}%` }} />
+      </div>
+
+      <p className="mt-5 text-[11px] font-medium text-slate-500">Today's plan</p>
+      <ul className="mt-2 space-y-2">
+        {steps.map((s) => (
+          <li key={s.text} className="flex items-center gap-3">
+            <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${s.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300'}`}>
+              {s.done && <CheckIcon className="h-3 w-3" />}
             </span>
-          </div>
-          <p className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-            {decks.length}
-          </p>
-          <p className="mt-1 text-xs text-slate-400">Your organized subjects</p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-500">Total Cards</p>
-            <span className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
-              <span className="block text-xl">▤</span>
+            <span className="leading-tight">
+              <span className="block text-[13px] font-medium text-slate-800">{s.text}</span>
+              <span className="block text-[11px] text-slate-400">{s.sub}</span>
             </span>
-          </div>
-          <p className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-            {totalCards}
-          </p>
-          <p className="mt-1 text-xs text-slate-400">Cards across all decks</p>
-        </div>
+          </li>
+        ))}
+      </ul>
+      <Link to="/planner" className="mt-4 inline-block text-xs font-medium text-brand-500 hover:underline">Open exam planner →</Link>
+    </section>
+  )
+}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-500">Average Cards</p>
-            <span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-              <span className="block text-xl">↗</span>
-            </span>
-          </div>
-          <p className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-            {decks.length ? Math.round(totalCards / decks.length) : 0}
-          </p>
-          <p className="mt-1 text-xs text-slate-400">Per study deck</p>
+function ActivityCard({ days }) {
+  const max = Math.max(1, ...days.flatMap((d) => [d.reviewed, d.newCards]))
+  return (
+    <section className={`${cardClass} p-6`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Last 7 days</p>
+          <h2 className="mt-1 text-xl font-medium tracking-tight text-slate-900">Study activity</h2>
         </div>
-      </section>
-
-      {/* Exam Plan */}
-      <section className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
-              SMART STUDY SCHEDULE
-            </p>
-            <h2 className="mt-1 text-xl font-bold text-slate-900">
-              📅 Exam Plan
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Your personalized daily card and revision targets.
-            </p>
-          </div>
-          {examPlan && examPlan.status !== 'no-exam' && (
-            <span
-              className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold ${
-                examPlan.status === 'on-track'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-red-100 text-red-700'
-              }`}
-            >
-              {examPlan.status === 'on-track' ? '✓ On track' : '⚠ Behind'}
-            </span>
-          )}
+        <div className="flex gap-3 text-[11px] text-slate-500">
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-brand-500" />Reviewed</span>
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-teal-400" />New cards</span>
         </div>
-
-        <div className="p-5 sm:p-6">
-          {planLoading ? (
-            <div className="animate-pulse space-y-4">
-              <div className="h-6 w-1/2 rounded bg-slate-200" />
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[1, 2, 3, 4].map((item) => (
-                  <div key={item} className="h-20 rounded-xl bg-slate-100" />
-                ))}
-              </div>
+      </div>
+      <div className="mt-6 flex h-44 gap-3 border-b border-slate-100">
+        {days.map((d) => (
+          <div key={d.date} className="flex flex-1 flex-col">
+            <div className="flex flex-1 items-end justify-center gap-1" title={`${d.reviewed} reviewed, ${d.newCards} new`}>
+              <div className="w-3 rounded-t bg-brand-500" style={{ height: `${(d.reviewed / max) * 100}%` }} />
+              <div className="w-3 rounded-t bg-teal-400" style={{ height: `${(d.newCards / max) * 100}%` }} />
             </div>
-          ) : !examPlan ? (
-            <p className="text-sm text-slate-500">
-              Exam plan could not be loaded. Please refresh the page.
-            </p>
-          ) : examPlan.status === 'no-exam' ? (
-            <div className="rounded-xl bg-slate-50 px-4 py-6 text-center">
-              <p className="text-lg font-semibold text-slate-800">
-                No exam date set
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                Add an exam date to your subject to get a personalized study plan.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-lg font-bold text-slate-900">
-                  Exam in {examPlan.daysLeft} {examPlan.daysLeft === 1 ? 'day' : 'days'}
-                </p>
-                <p className="text-sm text-slate-500">
-                  {getExamStatus()}
-                </p>
-              </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-3">
+        {days.map((d) => <span key={d.date} className="flex-1 text-center text-[10px] text-slate-400">{dayName(d.date)}</span>)}
+      </div>
+      {days.every((d) => !d.reviewed && !d.newCards) && <p className="mt-3 text-center text-xs text-slate-400">No study in this subject in the last 7 days.</p>}
+    </section>
+  )
+}
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl bg-indigo-50 p-4">
-                  <p className="text-xs font-medium text-indigo-600">New cards left</p>
-                  <p className="mt-2 text-2xl font-bold text-indigo-950">
-                    {examPlan.newCardsLeft}
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-blue-50 p-4">
-                  <p className="text-xs font-medium text-blue-600">Daily new target</p>
-                  <p className="mt-2 text-2xl font-bold text-blue-950">
-                    {examPlan.newPerDay ?? '—'}
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-emerald-50 p-4">
-                  <p className="text-xs font-medium text-emerald-600">Due today</p>
-                  <p className="mt-2 text-2xl font-bold text-emerald-950">
-                    {examPlan.dueToday}
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-violet-50 p-4">
-                  <p className="text-xs font-medium text-violet-600">Total cards</p>
-                  <p className="mt-2 text-2xl font-bold text-violet-950">
-                    {examPlan.totalCards}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <h3 className="mb-3 font-bold text-slate-900">
-                  Next 7 days schedule
-                </h3>
-
-                <div className="space-y-3">
-                  {examPlan.schedule?.map((day) => (
-                    <div
-                      key={day.date}
-                      className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <p className="font-semibold text-slate-800">
-                        {formatScheduleDate(day.date)}
-                      </p>
-
-                      <div className="flex flex-wrap gap-3 text-sm">
-                        <span className="rounded-lg bg-indigo-100 px-3 py-1.5 font-medium text-indigo-700">
-                          {day.newCards} new cards
-                        </span>
-                        <span className="rounded-lg bg-emerald-100 px-3 py-1.5 font-medium text-emerald-700">
-                          {day.reviews} reviews
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+function DeckCard({ subjectId, deck, onEdit, onDelete }) {
+  const pct = deck.cardCount ? Math.round((deck.learnedCards / deck.cardCount) * 100) : 0
+  return (
+    <div className={`${cardClass} relative overflow-hidden p-5`}>
+      <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-brand-500 to-brand-violet" />
+      <div className="flex items-start justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-brand-500"><LayersIcon /></span>
+        <div className="flex gap-1.5">
+          <IconButton label={`Edit ${deck.name}`} onClick={onEdit}><EditIcon /></IconButton>
+          <IconButton label={`Delete ${deck.name}`} onClick={onDelete} danger><TrashIcon /></IconButton>
         </div>
-      </section>
+      </div>
+      <h3 className="mt-4 truncate text-lg font-medium tracking-tight text-slate-900">{deck.name}</h3>
+      <p className="mt-1 line-clamp-2 min-h-8 text-xs text-slate-500">{deck.description || 'No description yet.'}</p>
 
-      {/* Create deck */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-slate-900">Create a new deck</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Give your next learning collection a name.
-          </p>
+      <div className="mt-5 flex items-center justify-between text-[11px] text-slate-500">
+        <span>{deck.cardCount} cards{deck.dueToday > 0 && <span className="text-brand-500"> · {deck.dueToday} due</span>}</span>
+        <span>{lastStudied(deck.lastStudiedAt)}</span>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Learned</span>
+        <span className="font-semibold text-slate-700">{pct}%</span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
+      </div>
+      <Link
+        to={`/subjects/${subjectId}/decks/${deck._id}`}
+        className="mt-5 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-2.5 text-[13px] font-semibold text-brand-500 transition hover:bg-brand-500 hover:text-white"
+      >
+        Open deck <span aria-hidden="true">→</span>
+      </Link>
+    </div>
+  )
+}
+
+// Subject page (Figma design): exam preparation, weekly activity and the subject's decks
+export default function SubjectDecks() {
+  const { id } = useParams()
+  const [data, setData] = useState(null) // { subject, decks, plan, activity }
+  const [error, setError] = useState('')
+  const [editing, setEditing] = useState(null) // null | {} (new) | deck
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const signal = controller.signal
+    Promise.all([getOverview({ signal }), getDecks(id), getExamPlan(id), getSubjectActivity(id, { signal })])
+      .then(([overview, decks, plan, activity]) => {
+        const subject = overview.subjects.find((s) => s._id === id)
+        if (!subject) return setError('Subject not found.')
+        setData({ subject, decks, plan, activity })
+      })
+      .catch((err) => {
+        if (err.code === 'ERR_CANCELED') return
+        setError(err.response?.status === 404 ? 'Subject not found.' : 'Could not load this subject.')
+      })
+    return () => controller.abort()
+  }, [id, reloadKey])
+
+  async function handleDelete(deck) {
+    if (!window.confirm(`Delete “${deck.name}”? Its ${deck.cardCount} cards and their reviews will be deleted too.`)) return
+    try {
+      await deleteDeck(deck._id)
+      toast.success('Deck deleted')
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      toast.error(errorText(err, 'Could not delete the deck.'))
+    }
+  }
+
+  if (error) {
+    return (
+      <div className={`${cardClass} px-6 py-12 text-center`}>
+        <p className="text-sm text-slate-500">{error}</p>
+        <Link to="/subjects" className={`${secondaryBtn} mt-4`}>Back to my subjects</Link>
+      </div>
+    )
+  }
+  if (!data) {
+    return (
+      <div className="space-y-4">
+        <div className="h-24 animate-pulse rounded-2xl bg-slate-200/70" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="h-80 animate-pulse rounded-2xl bg-slate-200/70" />
+          <div className="h-80 animate-pulse rounded-2xl bg-slate-200/70" />
         </div>
+      </div>
+    )
+  }
 
-        <form onSubmit={handleCreate} className="flex flex-col gap-3 sm:flex-row">
-          <input
-            type="text"
-            value={deckName}
-            onChange={(event) => setDeckName(event.target.value)}
-            placeholder="e.g. Data Structures, Operating Systems..."
-            maxLength={100}
-            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50"
-          />
+  const { subject, decks, plan, activity } = data
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <PlusIcon />
-            {saving ? 'Creating...' : 'Create Deck'}
-          </button>
-        </form>
+  return (
+    <div>
+      <nav className="flex items-center gap-2 text-xs text-slate-500">
+        <Link to="/subjects" className="hover:text-slate-900">My Subjects</Link>
+        <span>›</span>
+        <span className="font-medium text-slate-700">{subject.name}</span>
+      </nav>
 
-        <p className="mt-2 text-right text-xs text-slate-400">
-          {deckName.length}/100 characters
-        </p>
-      </section>
+      <div className="mb-6 mt-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-500">Subject</p>
+          <h1 className="mt-1 text-3xl font-medium tracking-tight text-slate-900">{subject.name}</h1>
+          {subject.description && <p className="mt-1 text-sm text-slate-500">{subject.description}</p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link to={`/subjects/${id}/notes`} className={secondaryBtn}>
+            <SparkIcon className="h-4 w-4 text-brand-500" /> Make cards from notes
+          </Link>
+          <Link to={`/study?subjectId=${id}`} className={primaryBtn}>
+            <PlayIcon className="h-3.5 w-3.5" /> Study this subject
+          </Link>
+        </div>
+      </div>
 
-      {/* Deck collection */}
-      <section>
-        <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
-              YOUR COLLECTION
-            </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-              All Study Decks
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Manage and organize your learning collections.
-            </p>
-          </div>
+      <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
+        <ExamCard subject={subject} plan={plan} />
+        <ActivityCard days={activity} />
+      </div>
 
-          <div className="relative w-full sm:max-w-xs">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <SearchIcon />
-            </span>
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search your decks..."
-              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
-            />
+      <div className="mb-3 mt-8 flex items-end justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Flashcard collections</p>
+          <h2 className="mt-1 text-xl font-medium tracking-tight text-slate-900">
+            Your decks <span className="text-sm text-slate-400">{decks.length}</span>
+          </h2>
+        </div>
+        <button type="button" onClick={() => setEditing({})} className={`${primaryBtn} px-5 py-2.5`}>+ New deck</button>
+      </div>
+
+      {decks.length === 0 ? (
+        <div className={`${cardClass} px-6 py-12 text-center`}>
+          <p className="text-sm text-slate-500">No decks yet. Create one, or let AI make cards from your notes.</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <button type="button" onClick={() => setEditing({})} className={primaryBtn}>+ New deck</button>
+            <Link to={`/subjects/${id}/notes`} className={secondaryBtn}>Make cards from notes</Link>
           </div>
         </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {decks.map((deck) => (
+            <DeckCard key={deck._id} subjectId={id} deck={deck} onEdit={() => setEditing(deck)} onDelete={() => handleDelete(deck)} />
+          ))}
+        </div>
+      )}
 
-        {loading ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((item) => (
-              <div
-                key={item}
-                className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5"
-              >
-                <div className="h-12 w-12 rounded-xl bg-slate-200" />
-                <div className="mt-5 h-5 w-2/3 rounded bg-slate-200" />
-                <div className="mt-3 h-3 w-1/2 rounded bg-slate-100" />
-                <div className="mt-8 h-9 rounded-lg bg-slate-100" />
-              </div>
-            ))}
-          </div>
-        ) : decks.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-              <BookIcon />
-            </div>
-            <h3 className="mt-5 text-xl font-bold text-slate-900">
-              Your learning journey starts here
-            </h3>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
-              You haven't created any study decks yet. Create your first deck
-              above and start organizing your learning material.
-            </p>
-          </div>
-        ) : filteredDecks.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center">
-            <div className="text-3xl">⌕</div>
-            <h3 className="mt-3 font-semibold text-slate-800">No decks found</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Try searching with a different name.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredDecks.map((deck, index) => (
-              <article
-                key={deck._id}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-950/5"
-              >
-                <div className={`h-2 bg-gradient-to-r ${cardColors[index % cardColors.length]}`} />
-
-                <div className="p-5">
-                  {editingId === deck._id ? (
-                    <form
-                      onSubmit={(event) => {
-                        event.preventDefault()
-                        handleRename(deck._id)
-                      }}
-                    >
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Rename deck
-                      </label>
-                      <input
-                        value={editingName}
-                        onChange={(event) => setEditingName(event.target.value)}
-                        maxLength={100}
-                        autoFocus
-                        className="mt-2 w-full rounded-xl border border-indigo-300 px-3 py-3 text-sm outline-none transition focus:ring-4 focus:ring-indigo-50"
-                      />
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="submit"
-                          disabled={renaming}
-                          className="flex-1 rounded-lg bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                        >
-                          {renaming ? 'Saving...' : 'Save changes'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelRename}
-                          disabled={renaming}
-                          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${cardColors[index % cardColors.length]} text-white shadow-lg`}>
-                          <BookIcon />
-                        </div>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
-                          Deck {index + 1}
-                        </span>
-                      </div>
-
-                      <Link
-                        to={`/subjects/${id}/decks/${deck._id}`}
-                        className="mt-5 block truncate text-lg font-bold text-slate-900 hover:text-indigo-600"
-                      >
-                        {deck.name}
-                      </Link>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Your personal learning collection
-                      </p>
-
-                      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-                        <div>
-                          <p className="text-2xl font-bold text-slate-900">
-                            {deck.cardCount ?? 0}
-                          </p>
-                          <p className="text-xs text-slate-400">Study cards</p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleShare(deck._id)}
-                            disabled={sharingId === deck._id}
-                            className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
-                          >
-                            {sharingId === deck._id ? 'Sharing...' : 'Share'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                setSharingId(deck._id)
-                                await unshareDeck(deck._id)
-                                toast.success('Deck sharing disabled successfully')
-                              } catch (error) {
-                                toast.error(error.response?.data?.error || 'Could not disable sharing')
-                              } finally {
-                                setSharingId(null)
-                              }
-                            }}
-                            disabled={sharingId === deck._id}
-                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-                          >
-                            {sharingId === deck._id ? 'Please wait...' : 'Unshare'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => startRename(deck)}
-                            aria-label={`Rename ${deck.name}`}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-                          >
-                            <EditIcon />
-                            Rename
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(deck._id)}
-                            disabled={deletingId === deck._id}
-                            aria-label={`Delete ${deck.name}`}
-                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                          >
-                            {deletingId === deck._id ? '...' : <TrashIcon />}
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+      {editing && (
+        <DeckModal
+          subjectId={id}
+          deck={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null)
+            setReloadKey((k) => k + 1)
+          }}
+        />
+      )}
     </div>
   )
 }

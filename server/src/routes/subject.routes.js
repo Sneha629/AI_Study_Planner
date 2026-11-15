@@ -9,7 +9,7 @@ const User = require('../models/User')
 const { todayIn, addDays } = require('../utils/dates')
 
 const router = Router()
-const subjectFields = ['name', 'examDate']
+const subjectFields = ['name', 'examDate', 'description']
 
 // "Today" in the user's own time zone, so an exam today is allowed even just after midnight
 async function userToday(userId) {
@@ -29,6 +29,14 @@ function validateSubject(body, today, partial = false) {
       errors.push({ field: 'name', message: 'Name is required' })
     } else if (body.name.trim().length > 100) {
       errors.push({ field: 'name', message: 'Name must be at most 100 characters' })
+    }
+  }
+
+  if (Object.hasOwn(body, 'description') && body.description !== null) {
+    if (typeof body.description !== 'string') {
+      errors.push({ field: 'description', message: 'Description must be text' })
+    } else if (body.description.trim().length > 300) {
+      errors.push({ field: 'description', message: 'Description must be at most 300 characters' })
     }
   }
 
@@ -72,6 +80,39 @@ function sendValidationError(res, errors) {
 router.get('/', async (req, res) => {
   const subjects = await Subject.find({ userId: req.userId }).sort({ createdAt: -1 })
   res.json(subjects)
+})
+
+// Subject page chart: reviews per day for the last 7 days, split into first-time
+// (new) cards and repeat reviews. Days are in the user's time zone.
+router.get('/:id/activity', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ error: 'Subject not found' })
+  }
+  const subject = await Subject.findOne({ _id: req.params.id, userId: req.userId }).select('_id')
+  if (!subject) return res.status(404).json({ error: 'Subject not found' })
+
+  const user = await User.findById(req.userId).select('timezone')
+  const timezone = user?.timezone || 'Asia/Kolkata'
+  const today = todayIn(timezone)
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6))
+
+  const deckIds = await Deck.find({ subjectId: subject._id }).distinct('_id')
+  const cardIds = deckIds.length ? await Card.find({ deckId: { $in: deckIds } }).distinct('_id') : []
+  const rows = cardIds.length
+    ? await Review.aggregate([
+        { $match: { userId: new mongoose.Types.ObjectId(req.userId), cardId: { $in: cardIds }, reviewedAt: { $gte: new Date(Date.now() - 8 * 86400000) } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$reviewedAt', timezone } },
+            reviewed: { $sum: { $cond: [{ $gt: ['$intervalBefore', 0] }, 1, 0] } },
+            newCards: { $sum: { $cond: [{ $eq: ['$intervalBefore', 0] }, 1, 0] } },
+          },
+        },
+      ])
+    : []
+  const byDay = new Map(rows.map((r) => [r._id, r]))
+
+  res.json(days.map((date) => ({ date, reviewed: byDay.get(date)?.reviewed || 0, newCards: byDay.get(date)?.newCards || 0 })))
 })
 
 router.get('/:id/plan', async (req, res) => {
@@ -198,6 +239,7 @@ router.post('/', async (req, res) => {
   const subject = await Subject.create({
     userId: req.userId,
     name: req.body.name.trim(),
+    description: (req.body.description ?? '').trim(),
     ...(Object.hasOwn(req.body, 'examDate') ? { examDate: req.body.examDate } : {}),
   })
   res.status(201).json(subject)
@@ -212,7 +254,11 @@ router.patch('/:id', async (req, res) => {
   if (errors.length) return sendValidationError(res, errors)
 
   const updates = Object.fromEntries(
-    Object.entries(req.body).map(([field, value]) => [field, field === 'name' ? value.trim() : value]),
+    Object.entries(req.body).map(([field, value]) => {
+      if (field === 'name') return [field, value.trim()]
+      if (field === 'description') return [field, (value ?? '').trim()]
+      return [field, value]
+    }),
   )
   const subject = await Subject.findOneAndUpdate(
     { _id: req.params.id, userId: req.userId },

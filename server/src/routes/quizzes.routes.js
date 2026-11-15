@@ -176,6 +176,41 @@ router.get('/quizzes/:id', async (req, res) => {
 })
 
 
+// GET /api/quizzes?limit=20 - the user's submitted quizzes across all decks, newest first
+// (AI Quiz page history). Quizzes from decks that were deleted are left out.
+router.get('/quizzes', async (req, res) => {
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 20, 1), 50)
+
+  // Only decks that still exist and belong to this user, so the limit counts real rows
+  const subjects = await Subject.find({ userId: req.userId }).select('name').lean()
+  const decks = await Deck.find({ subjectId: { $in: subjects.map((s) => s._id) } }).select('name subjectId').lean()
+  const deckById = new Map(decks.map((d) => [d._id.toString(), d]))
+  const subjectName = new Map(subjects.map((s) => [s._id.toString(), s.name]))
+
+  const attempts = await QuizAttempt.find({ userId: req.userId, deckId: { $in: decks.map((d) => d._id) }, score: { $ne: null } })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit)
+    .select('_id deckId score total createdAt')
+    .lean()
+
+  res.json(
+    attempts.map((a) => {
+        const deck = deckById.get(a.deckId.toString())
+        return {
+          _id: a._id,
+          deckId: a.deckId,
+          deckName: deck.name,
+          subjectId: deck.subjectId,
+          subjectName: subjectName.get(deck.subjectId.toString()),
+          score: a.score,
+          total: a.total,
+          percent: Math.round((a.score / a.total) * 100),
+          createdAt: a.createdAt,
+        }
+      }),
+  )
+})
+
 // GET /api/decks/:id/quizzes
 router.get('/decks/:id/quizzes', async (req, res) => {
   const deck = await findOwnDeck(req.params.id, req.userId)
